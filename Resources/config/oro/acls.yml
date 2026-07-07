@@ -1,0 +1,12 @@
+acls:
+  genaker_oroai_chat:
+    type: action
+    label: 'Use AI Assistant'
+    group_name: ''
+    category: ''
+
+  genaker_oroai_sql:
+    type: action
+    label: 'AI Assistant SQL Tool'
+    group_name: ''
+    category: ''

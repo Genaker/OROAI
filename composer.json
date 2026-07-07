@@ -1,0 +1,58 @@
+{
+    "name": "genaker/oroai",
+    "description": "AI assistant bundle for OroCommerce — multi-provider LLM chat (OpenAI, Gemini, Anthropic) with tool use, RAG knowledge base, and Redis Stack vector search",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": [
+        "orocommerce",
+        "oro",
+        "ai",
+        "llm",
+        "rag",
+        "gemini",
+        "openai",
+        "anthropic",
+        "chatbot",
+        "vector-search",
+        "redisearch"
+    ],
+    "authors": [
+        {
+            "name": "Genaker",
+            "homepage": "https://github.com/Genaker"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "predis/predis": "^2.0",
+        "symfony/http-client": "^6.4|^7.0",
+        "symfony/yaml": "^6.4|^7.0",
+        "symfony/form": "^6.4|^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
+    },
+    "suggest": {
+        "oroinc/orocommerce": "OroCommerce platform the bundle is designed for",
+        "redis/redis-stack-server": "Required for vector search (RediSearch). Use image redis/redis-stack-server:7.4.0-v3 in Docker."
+    },
+    "autoload": {
+        "psr-4": {
+            "Genaker\\Bundle\\OroAI\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Genaker\\Bundle\\OroAI\\Tests\\": "Tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        }
+    }
+}

@@ -1,0 +1,178 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  # Form types
+  Genaker\Bundle\OroAI\Form\Type\AiModelChoiceType:
+    arguments:
+      $modelsFile: '%kernel.project_dir%/src/Genaker/Bundle/OroAI/Resources/config/ai_models.yml'
+    tags: ['form.type']
+
+  # Config
+  Genaker\Bundle\OroAI\Service\OroAiConfig:
+    public: true
+    arguments:
+      $crypter: '@oro_security.encoder.default'
+
+  # LLM Clients
+  Genaker\Bundle\OroAI\Llm\OpenAiClient:
+    arguments:
+      $httpClient: '@http_client'
+    tags: ['genaker_oroai.llm_client']
+
+  Genaker\Bundle\OroAI\Llm\AnthropicClient:
+    arguments:
+      $httpClient: '@http_client'
+    tags: ['genaker_oroai.llm_client']
+
+  Genaker\Bundle\OroAI\Llm\GeminiClient:
+    arguments:
+      $httpClient: '@http_client'
+    tags: ['genaker_oroai.llm_client']
+
+  Genaker\Bundle\OroAI\Llm\LlmClientRegistry:
+    public: true
+    arguments:
+      $clients: !tagged_iterator genaker_oroai.llm_client
+
+  # Tools
+  Genaker\Bundle\OroAI\Tools\SqlQueryTool:
+    arguments:
+      $connection: '@doctrine.dbal.default_connection'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\SchemaInspectorTool:
+    arguments:
+      $connection: '@doctrine.dbal.default_connection'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\EntityUrlTool:
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\FindEntityTool:
+    arguments:
+      $doctrine: '@doctrine'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\DocSearchTool:
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\ConfigInspectorTool:
+    arguments:
+      $configManager: '@oro_config.manager'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\EntityMetadataTool:
+    arguments:
+      $doctrine: '@doctrine'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\RouteSearchTool:
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\LogReaderTool:
+    arguments:
+      $logDir: '%kernel.logs_dir%'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\SystemInfoTool:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
+      $environment: '%kernel.environment%'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\TranslationTool:
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\UserInfoTool:
+    arguments:
+      $connection: '@doctrine.dbal.default_connection'
+    tags: ['genaker_oroai.tool']
+
+  # Tool Registry
+  Genaker\Bundle\OroAI\Agent\ToolRegistry:
+    public: true
+    arguments:
+      $tools: !tagged_iterator genaker_oroai.tool
+      $config: '@Genaker\Bundle\OroAI\Service\OroAiConfig'
+
+  # RAG — Redis connection for RediSearch (DB 4)
+  genaker_oroai.redis_connection:
+    class: Predis\Client
+    arguments:
+      - '%env(default:genaker_oroai.redis_default:OROAI_REDIS_URL)%'
+
+  Genaker\Bundle\OroAI\Rag\OpenAiEmbeddingClient:
+    arguments:
+      $httpClient: '@http_client'
+
+  Genaker\Bundle\OroAI\Rag\GeminiEmbeddingClient:
+    arguments:
+      $httpClient: '@http_client'
+
+  Genaker\Bundle\OroAI\Rag\ProviderAwareEmbeddingClient: ~
+
+  Genaker\Bundle\OroAI\Rag\EmbeddingClientInterface:
+    alias: Genaker\Bundle\OroAI\Rag\ProviderAwareEmbeddingClient
+
+  Genaker\Bundle\OroAI\Rag\RediSearchRagStore:
+    public: true
+    arguments:
+      $redis: '@genaker_oroai.redis_connection'
+
+  Genaker\Bundle\OroAI\Rag\RagStoreInterface:
+    alias: Genaker\Bundle\OroAI\Rag\RediSearchRagStore
+
+  Genaker\Bundle\OroAI\Rag\RagIndexer:
+    public: true
+    arguments:
+      $connection: '@doctrine.dbal.default_connection'
+
+  # RAG Providers — add a new tagged service here to extend the knowledge base
+  Genaker\Bundle\OroAI\Rag\Provider\DocFilesRagProvider:
+    tags: ['genaker_oroai.rag_provider']
+
+  Genaker\Bundle\OroAI\Rag\Provider\SchemaRagProvider:
+    arguments:
+      $connection: '@doctrine.dbal.default_connection'
+    tags: ['genaker_oroai.rag_provider']
+
+  Genaker\Bundle\OroAI\Rag\Provider\MenuRagProvider:
+    arguments:
+      $router: '@router'
+    tags: ['genaker_oroai.rag_provider']
+
+  Genaker\Bundle\OroAI\Rag\Provider\SystemConfigRagProvider:
+    arguments:
+      $connection: '@doctrine.dbal.default_connection'
+    tags: ['genaker_oroai.rag_provider']
+
+  # Agent
+  Genaker\Bundle\OroAI\Agent\OroAiAgent:
+    public: true
+
+  Genaker\Bundle\OroAI\Agent\LearningRecorder:
+    public: true
+
+  # Commands
+  Genaker\Bundle\OroAI\Command\RagReindexCommand:
+    arguments:
+      $providers: !tagged_iterator genaker_oroai.rag_provider
+    tags: ['console.command']
+
+  Genaker\Bundle\OroAI\Command\RagTestCommand:
+    tags: ['console.command']
+
+  Genaker\Bundle\OroAI\Command\EnsureTestAdminUserCommand:
+    arguments:
+      $userManager: '@oro_user.manager'
+    tags: ['console.command']
+
+  # Controller
+  Genaker\Bundle\OroAI\Controller\ChatController:
+    public: true
+    tags: ['controller.service_arguments']
+    arguments:
+      $twig: '@twig'

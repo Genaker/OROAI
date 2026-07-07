@@ -1,0 +1,194 @@
+// OroAI Chat Widget Styles
+// ---------------------------------------------------------
+
+$oroai-primary: #1a73e8;
+$oroai-primary-hover: #1557b0;
+$oroai-bg-user: #e3f2fd;
+$oroai-bg-assistant: #f5f5f5;
+$oroai-bg-error: #ffebee;
+$oroai-color-error: #c62828;
+$oroai-border: #ccc;
+$oroai-border-light: #eee;
+$oroai-bg-input-area: #fafafa;
+$oroai-text-muted: #888;
+$oroai-font-size: 13px;
+$oroai-panel-width: 420px;
+$oroai-panel-radius: 6px;
+$oroai-msg-radius: 8px;
+$oroai-transition-speed: 0.3s;
+$oroai-z-index: 10000;
+
+// Header item (the <li> in user-menu)
+.oroai-header-item {
+  position: relative;
+}
+
+// Trigger icon link
+.oroai-trigger {
+  cursor: pointer;
+  font-size: 16px;
+  color: inherit;
+  text-decoration: none !important;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+// Dropdown panel
+.oroai-chat-dropdown {
+  position: fixed;
+  top: 50px;
+  right: 10px;
+  width: $oroai-panel-width;
+  max-height: calc(100vh - 70px);
+  background: #fff;
+  border: 1px solid $oroai-border;
+  border-radius: $oroai-panel-radius;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  z-index: $oroai-z-index;
+  overflow: hidden;
+}
+
+// Header bar
+.oroai-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: $oroai-primary;
+  color: #fff;
+  font-weight: 600;
+  font-size: $oroai-font-size;
+  cursor: pointer;
+  user-select: none;
+}
+
+.oroai-chat-title {
+  flex: 1;
+}
+
+.oroai-header-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.oroai-minimize-btn,
+.oroai-close-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  opacity: 0.8;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// Body (accordion)
+.oroai-chat-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  transition: max-height $oroai-transition-speed ease;
+
+  &.minimized {
+    max-height: 0 !important;
+    overflow: hidden;
+    padding: 0;
+  }
+}
+
+// Messages area
+.oroai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  min-height: 150px;
+  max-height: calc(100vh - 200px);
+}
+
+// Message bubbles
+.oroai-chat-msg {
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border-radius: $oroai-msg-radius;
+  font-size: $oroai-font-size;
+  line-height: 1.4;
+  max-width: 88%;
+  word-wrap: break-word;
+
+  &.user {
+    background: $oroai-bg-user;
+    margin-left: auto;
+    text-align: right;
+  }
+
+  &.assistant {
+    background: $oroai-bg-assistant;
+    margin-right: auto;
+  }
+
+  &.error {
+    background: $oroai-bg-error;
+    color: $oroai-color-error;
+    margin-right: auto;
+  }
+
+  a {
+    color: $oroai-primary;
+    text-decoration: underline;
+  }
+
+  .tool-trace {
+    font-size: 11px;
+    color: $oroai-text-muted;
+    margin-top: 4px;
+    border-top: 1px solid $oroai-border-light;
+    padding-top: 4px;
+  }
+}
+
+// Input area
+.oroai-chat-input-area {
+  padding: 8px;
+  border-top: 1px solid $oroai-border-light;
+  background: $oroai-bg-input-area;
+}
+
+#oroai-form {
+  display: flex;
+  gap: 6px;
+}
+
+.oroai-chat-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid $oroai-border;
+  border-radius: 4px;
+  font-size: $oroai-font-size;
+  outline: none;
+
+  &:focus {
+    border-color: $oroai-primary;
+  }
+}
+
+.oroai-send-btn {
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
+// Loading indicator
+.oroai-chat-loading {
+  text-align: center;
+  padding: 8px;
+  color: $oroai-text-muted;
+  font-size: 12px;
+}

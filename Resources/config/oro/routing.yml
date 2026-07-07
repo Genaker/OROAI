@@ -1,0 +1,4 @@
+genaker_oroai:
+  resource: Genaker\Bundle\OroAI\Controller\ChatController
+  type: attribute
+  prefix: /

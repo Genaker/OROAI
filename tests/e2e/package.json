@@ -1,0 +1,12 @@
+{
+    "name": "oroai-e2e-tests",
+    "private": true,
+    "version": "1.0.0",
+    "description": "Standalone Playwright e2e suite for GenakerOroAIBundle's Chat API",
+    "scripts": {
+        "test": "playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.60.0"
+    }
+}

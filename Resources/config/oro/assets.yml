@@ -1,0 +1,3 @@
+css:
+    inputs:
+        - 'bundles/genakeroroai/css/scss/oroai-chat.scss'

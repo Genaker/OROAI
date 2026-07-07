@@ -1,0 +1,8 @@
+genaker:
+  oroai:
+    chat:
+      title: 'Oro AI Assistant'
+      placeholder: 'Ask about OroCommerce...'
+      send: 'Send'
+      thinking: 'Thinking...'
+      error: 'An error occurred'

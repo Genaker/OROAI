@@ -1,0 +1,177 @@
+{% if is_granted('genaker_oroai_chat') %}
+<style>
+.desktop-version .app-header__container { gap: 0; }
+/* ── Inline input in the header search row ───────────────────────────────── */
+.oroai-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    max-height: 36px;
+    flex: 1 1 200px;
+    min-width: 160px;
+    max-width: 400px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+/* Input bar when relocated inside the chat panel */
+#oroai-panel-input-bar .oroai-inline {
+    display: flex;
+    max-width: none;
+    max-height: none;
+    height: auto;
+    margin-left: 0;
+    flex: 1;
+    width: 100%;
+}
+#oroai-panel-input-bar .oroai-inline-input {
+    height: 32px;
+    font-size: 13px;
+}
+#oroai-panel-input-bar {
+    padding: 6px 0 2px;
+    border-top: 1px solid #f0f0f0;
+}
+.oroai-inline-input {
+    flex: 1;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid #c8c8c8;
+    border-radius: 4px;
+    font-size: 12px;
+    background: #fff;
+    color: #333;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    min-width: 0;
+}
+.oroai-inline-input:focus {
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26,115,232,.15);
+}
+.oroai-inline-send {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    margin-top: -8px;
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background .15s;
+}
+.oroai-inline-send:hover  { background: #1558b0; }
+.oroai-inline-send:active { background: #0f3f7f; }
+.oroai-inline-send:disabled { background: #94b8f0; cursor: default; }
+
+/* ── Sliding message panel ───────────────────────────────────────────────── */
+.oroai-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .3s ease;
+    background: #fff;
+    border-bottom: 2px solid #1a73e8;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    width: 100%;
+    position: relative;
+    z-index: 100;
+}
+.oroai-panel.oroai-panel--open { max-height: 480px; }
+.oroai-panel-inner {
+    display: flex;
+    flex-direction: column;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+.oroai-hc-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+}
+.oroai-hc-bar-btns { display: flex; gap: 4px; }
+.oroai-hc-bar-btns button {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    padding: 2px 6px;
+    font-size: 12px;
+    line-height: 1;
+}
+.oroai-hc-bar-btns button:hover { color: #1a73e8; }
+.oroai-hc-msgs-wrap { max-height: 280px; overflow-y: auto; padding: 8px 0; }
+.oroai-hc-msg {
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.45;
+    max-width: 85%;
+    word-wrap: break-word;
+}
+.oroai-hc-msg.user      { background: #e3f2fd; margin-left: auto; text-align: right; }
+.oroai-hc-msg.assistant { background: #f5f5f5; border: 1px solid #e8e8e8; margin-right: auto; }
+.oroai-hc-msg.error     { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; margin-right: auto; }
+.oroai-hc-msg a         { color: #1a73e8; text-decoration: underline; }
+.oroai-hc-msg .oroai-trace { font-size: 10px; color: #9e9e9e; margin-top: 3px; border-top: 1px solid #f0f0f0; padding-top: 2px; }
+.oroai-hc-loading       { text-align: center; padding: 5px; color: #9e9e9e; font-size: 11px; font-style: italic; }
+</style>
+
+{# Inline input — rendered inside .app-header__search-and-shortcuts via navbar placeholder #}
+<div class="oroai-inline"
+     id="oroai-hc"
+     data-message-url="{{ path('genaker_oroai_chat_message') }}"
+     data-csrf-token="{{ csrf_token('') }}">
+    <input type="text"
+           class="oroai-inline-input"
+           id="oroai-hc-input"
+           placeholder="Ask OroCommerce AI…"
+           autocomplete="off"
+           aria-label="Ask AI assistant" />
+    <button type="button"
+            class="oroai-inline-send"
+            id="oroai-hc-send"
+            title="Send"
+            aria-label="Send message">
+        <i class="fa fa-paper-plane" aria-hidden="true"></i>
+    </button>
+</div>
+{# anchor marks the original header slot so JS can return the input here on panel close #}
+<span id="oroai-hc-anchor" style="display:none;"></span>
+
+{# Message history panel — JS moves this to sit right after .app-header__container-panel #}
+<div class="oroai-panel" id="oroai-panel" aria-hidden="true">
+    <div class="oroai-panel-inner">
+        <div id="oroai-hc-body" style="display:none">
+            <div class="oroai-hc-bar">
+                <span>AI Assistant (gemini)</span>
+                <div class="oroai-hc-bar-btns">
+                    <button type="button" id="oroai-hc-minimize" title="Minimize" aria-label="Minimize">
+                        <i class="fa fa-minus" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="oroai-hc-clear" title="Clear conversation" aria-label="Clear">
+                        <i class="fa fa-trash-o" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="oroai-hc-msgs-wrap">
+                <div id="oroai-hc-msgs"></div>
+            </div>
+            <div id="oroai-panel-input-bar"></div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ asset('bundles/genakeroroai/js/oroai-chat.js') }}"></script>
+{% endif %}

@@ -1,0 +1,2 @@
+bundles:
+  - { name: Genaker\Bundle\OroAI\GenakerOroAIBundle, priority: 200 }

@@ -1,0 +1,310 @@
+system_configuration:
+  groups:
+    genaker_oroai_group:
+      title: 'Oro AI Assistant'
+      icon: 'fa-robot'
+      page_reload: false
+
+    genaker_oroai_settings:
+      title: 'AI Assistant Settings'
+      page_reload: false
+
+    genaker_oroai_tools:
+      title: 'Enabled Tools'
+      page_reload: false
+
+  fields:
+    genaker_oro_ai.provider:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\ChoiceType
+      search_type: text
+      options:
+        label: 'LLM Provider'
+        tooltip: 'Select the LLM provider. Can be overridden with OROAI_PROVIDER env var.'
+        required: true
+        constraints:
+          - NotBlank: ~
+          - Choice:
+              choices: ['openai', 'anthropic', 'gemini']
+        choices:
+          'OpenAI': 'openai'
+          'Anthropic (Claude)': 'anthropic'
+          'Google Gemini': 'gemini'
+      priority: 100
+
+    genaker_oro_ai.api_key:
+      data_type: string
+      type: Oro\Bundle\FormBundle\Form\Type\OroEncodedPlaceholderPasswordType
+      search_type: text
+      options:
+        label: 'API Key'
+        tooltip: 'Provider API key. Can be overridden with OROAI_API_KEY env var.'
+        resettable: true
+        required: false
+      priority: 95
+
+    genaker_oro_ai.api_url:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'API URL (optional)'
+        tooltip: 'Override the default API endpoint. Leave empty for the provider default.'
+        required: false
+        attr:
+          placeholder: 'Leave empty for default'
+      priority: 90
+
+    genaker_oro_ai.model:
+      data_type: string
+      type: Genaker\Bundle\OroAI\Form\Type\AiModelChoiceType
+      search_type: text
+      options:
+        label: 'Model'
+        tooltip: 'Select the model to use. Leave empty to use the provider default. Models are defined in Resources/config/ai_models.yml.'
+      priority: 85
+
+    genaker_oro_ai.temperature:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'Temperature'
+        tooltip: 'LLM temperature (0.0 - 1.0). Lower = more deterministic.'
+        required: false
+        attr:
+          placeholder: '0.3'
+      priority: 80
+
+    genaker_oro_ai.max_iterations:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'Max Tool Iterations'
+        tooltip: 'Maximum number of tool-calling rounds per request.'
+        required: false
+        attr:
+          placeholder: '5'
+      priority: 75
+
+    genaker_oro_ai.embedding_api_key:
+      data_type: string
+      type: Oro\Bundle\FormBundle\Form\Type\OroEncodedPlaceholderPasswordType
+      search_type: text
+      options:
+        label: 'Embedding API Key'
+        tooltip: 'API key for embedding provider (defaults to main API key if empty).'
+        resettable: true
+        required: false
+      priority: 70
+
+    genaker_oro_ai.embedding_url:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'Embedding API URL (optional)'
+        tooltip: 'Override embedding endpoint. Leave empty for OpenAI default.'
+        required: false
+        attr:
+          placeholder: 'https://api.openai.com/v1/embeddings'
+      priority: 65
+
+    genaker_oro_ai.embedding_model:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'Embedding Model'
+        tooltip: 'Embedding model name.'
+        required: false
+        attr:
+          placeholder: 'text-embedding-3-small'
+      priority: 60
+
+    genaker_oro_ai.sql_tool_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      search_type: text
+      options:
+        label: 'Enable SQL Query Tool'
+        tooltip: 'Allow the AI to run read-only SELECT queries against the database.'
+      priority: 55
+
+    genaker_oro_ai.sql_row_limit:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'SQL Row Limit'
+        tooltip: 'Maximum number of rows returned by SQL queries.'
+        required: false
+        attr:
+          placeholder: '200'
+      priority: 50
+
+    genaker_oro_ai.rag_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      search_type: text
+      options:
+        label: 'Enable RAG'
+        tooltip: 'Enable retrieval-augmented generation from the knowledge base.'
+      priority: 45
+
+    genaker_oro_ai.rag_top_k:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'RAG Top-K Results'
+        tooltip: 'Number of knowledge base chunks to include as context.'
+        required: false
+        attr:
+          placeholder: '5'
+      priority: 40
+
+    genaker_oro_ai.learning_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      search_type: text
+      options:
+        label: 'Enable Learning'
+        tooltip: 'When enabled, successful SQL corrections are saved to improve future queries.'
+      priority: 35
+
+    genaker_oro_ai.tool_sql_query_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'SQL Query'
+        tooltip: 'Run read-only SELECT queries against the database.'
+      priority: 100
+
+    genaker_oro_ai.tool_schema_inspector_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Schema Inspector'
+        tooltip: 'Inspect database tables and column definitions.'
+      priority: 95
+
+    genaker_oro_ai.tool_entity_url_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Entity URL'
+        tooltip: 'Generate admin URLs for OroCommerce entities.'
+      priority: 90
+
+    genaker_oro_ai.tool_find_entity_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Find Entity'
+        tooltip: 'Search for entities by name or identifier.'
+      priority: 85
+
+    genaker_oro_ai.tool_doc_search_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Doc Search'
+        tooltip: 'Search the OroCommerce knowledge base / documentation.'
+      priority: 80
+
+    genaker_oro_ai.tool_config_inspector_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Config Inspector'
+        tooltip: 'Read system configuration values.'
+      priority: 75
+
+    genaker_oro_ai.tool_entity_metadata_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Entity Metadata'
+        tooltip: 'Inspect Doctrine entity mappings and field definitions.'
+      priority: 70
+
+    genaker_oro_ai.tool_route_search_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Route Search'
+        tooltip: 'Search registered Symfony routes.'
+      priority: 65
+
+    genaker_oro_ai.tool_log_reader_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Log Reader'
+        tooltip: 'Read application log files. Disable on production to prevent log exposure.'
+      priority: 60
+
+    genaker_oro_ai.tool_system_info_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'System Info'
+        tooltip: 'Expose PHP/OS/environment information. Disable on production.'
+      priority: 55
+
+    genaker_oro_ai.tool_translation_lookup_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Translation Lookup'
+        tooltip: 'Look up translation keys and their values.'
+      priority: 50
+
+    genaker_oro_ai.tool_user_info_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'User Info'
+        tooltip: 'Query user accounts and roles.'
+      priority: 45
+
+  tree:
+    system_configuration:
+      platform:
+        children:
+          general_setup:
+            children:
+              genaker_oroai_group:
+                children:
+                  genaker_oroai_settings:
+                    children:
+                      - genaker_oro_ai.provider
+                      - genaker_oro_ai.api_key
+                      - genaker_oro_ai.api_url
+                      - genaker_oro_ai.model
+                      - genaker_oro_ai.temperature
+                      - genaker_oro_ai.max_iterations
+                      - genaker_oro_ai.embedding_api_key
+                      - genaker_oro_ai.embedding_url
+                      - genaker_oro_ai.embedding_model
+                      - genaker_oro_ai.sql_tool_enabled
+                      - genaker_oro_ai.sql_row_limit
+                      - genaker_oro_ai.rag_enabled
+                      - genaker_oro_ai.rag_top_k
+                      - genaker_oro_ai.learning_enabled
+                  genaker_oroai_tools:
+                    children:
+                      - genaker_oro_ai.tool_sql_query_enabled
+                      - genaker_oro_ai.tool_schema_inspector_enabled
+                      - genaker_oro_ai.tool_entity_url_enabled
+                      - genaker_oro_ai.tool_find_entity_enabled
+                      - genaker_oro_ai.tool_doc_search_enabled
+                      - genaker_oro_ai.tool_config_inspector_enabled
+                      - genaker_oro_ai.tool_entity_metadata_enabled
+                      - genaker_oro_ai.tool_route_search_enabled
+                      - genaker_oro_ai.tool_log_reader_enabled
+                      - genaker_oro_ai.tool_system_info_enabled
+                      - genaker_oro_ai.tool_translation_lookup_enabled
+                      - genaker_oro_ai.tool_user_info_enabled

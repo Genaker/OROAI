@@ -1,0 +1,166 @@
+<div class="oroai-dw"
+     data-message-url="{{ path('genaker_oroai_chat_message') }}"
+     data-csrf-token="{{ csrf_token('') }}">
+
+<style>
+.oroai-dw{font-size:13px}
+.oroai-dw-body{display:none;margin-bottom:6px}
+.oroai-dw-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#1a73e8;color:#fff;border-radius:4px 4px 0 0;font-size:12px;font-weight:600}
+.oroai-dw-bar-btns{display:flex;gap:4px}
+.oroai-dw-bar-btns button{background:none;border:none;color:#fff;cursor:pointer;opacity:.8;padding:2px 5px;font-size:13px;line-height:1}
+.oroai-dw-bar-btns button:hover{opacity:1}
+.oroai-dw-msgs{max-height:300px;overflow-y:auto;padding:10px;background:#fafafa;border:1px solid #e8e8e8;border-top:0;border-radius:0 0 4px 4px}
+.oroai-dw-msg{margin-bottom:7px;padding:6px 10px;border-radius:8px;font-size:12px;line-height:1.45;max-width:90%;word-wrap:break-word}
+.oroai-dw-msg.user{background:#e3f2fd;margin-left:auto;text-align:right}
+.oroai-dw-msg.assistant{background:#fff;border:1px solid #e0e0e0;margin-right:auto}
+.oroai-dw-msg.error{background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;margin-right:auto}
+.oroai-dw-msg a{color:#1a73e8;text-decoration:underline}
+.oroai-dw-msg .oroai-trace{font-size:10px;color:#9e9e9e;margin-top:3px;border-top:1px solid #f0f0f0;padding-top:2px}
+.oroai-dw-loading{text-align:center;padding:5px;color:#9e9e9e;font-size:11px;font-style:italic}
+.oroai-dw-notice{padding:7px 10px;border-radius:4px;margin-bottom:8px;font-size:12px}
+.oroai-dw-notice.warning{background:#fff8e1;border:1px solid #ffe082;color:#5d4037}
+.oroai-dw-notice a{color:inherit;text-decoration:underline}
+.oroai-dw-input-row{display:flex;gap:6px}
+.oroai-dw-input{flex:1;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:12px;outline:none}
+.oroai-dw-input:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.15)}
+</style>
+
+{% if not configured %}
+<div class="oroai-dw-notice warning">
+    <strong>Not configured.</strong>
+    <a href="{{ path('oro_config_configuration_system', {activeGroup: 'platform', activeSubGroup: 'genaker_oroai_settings'}) }}">
+        Set your API key in System → Configuration → Oro AI Assistant
+    </a>
+</div>
+{% endif %}
+
+{# messages body — hidden until first send #}
+<div class="oroai-dw-body">
+    <div class="oroai-dw-bar">
+        <span>AI Assistant</span>
+        <div class="oroai-dw-bar-btns">
+            <button type="button" class="oroai-dw-minimize" title="Minimize" aria-label="Minimize">
+                <span class="fa-minus" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="oroai-dw-clear" title="Clear conversation" aria-label="Clear">
+                <span class="fa-trash-o" aria-hidden="true"></span>
+            </button>
+        </div>
+    </div>
+    <div class="oroai-dw-msgs"></div>
+</div>
+
+{# input — always visible #}
+<div class="oroai-dw-input-row">
+    <input type="text"
+           class="oroai-dw-input"
+           placeholder="Ask about OroCommerce…"
+           autocomplete="off"
+           {% if not configured %}disabled{% endif %} />
+    <button type="button"
+            class="btn btn-primary btn-sm oroai-dw-send"
+            {% if not configured %}disabled{% endif %}>
+        <span class="fa-paper-plane" aria-hidden="true"></span> Send
+    </button>
+</div>
+
+<script>
+(function () {
+    var root = document.currentScript.parentElement;
+    if (!root || !root.classList.contains('oroai-dw')) return;
+
+    var messageUrl  = root.dataset.messageUrl;
+    var csrfToken   = root.dataset.csrfToken;
+    var body        = root.querySelector('.oroai-dw-body');
+    var msgs        = root.querySelector('.oroai-dw-msgs');
+    var minimizeBtn = root.querySelector('.oroai-dw-minimize');
+    var clearBtn    = root.querySelector('.oroai-dw-clear');
+    var input       = root.querySelector('.oroai-dw-input');
+    var sendBtn     = root.querySelector('.oroai-dw-send');
+
+    var history = [];
+
+    function expand() { body.style.display = 'block'; }
+    function collapse() { body.style.display = 'none'; }
+
+    minimizeBtn.addEventListener('click', collapse);
+    clearBtn.addEventListener('click', function () {
+        history = [];
+        msgs.innerHTML = '';
+        collapse();
+    });
+
+    function send() {
+        var msg = input.value.trim();
+        if (!msg || sendBtn.disabled) return;
+
+        expand();
+        input.value = '';
+        addMsg('user', msg);
+        history.push({role: 'user', content: msg});
+        setLoading(true);
+
+        fetch(messageUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({message: msg, history: history.slice(-20)})
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            setLoading(false);
+            if (data.error) {
+                addMsg('error', data.error);
+                return;
+            }
+            var reply = (data.reply || 'No response.')
+                .replace(/(\/admin\/[^\s<>"']+)/g, '<a href="$1">$1</a>');
+            var trace = data.tool_trace || [];
+            var traceHtml = trace.length
+                ? '<div class="oroai-trace">Tools: ' + trace.map(function (t) { return t.tool; }).join(', ') + '</div>'
+                : '';
+            addMsg('assistant', reply + traceHtml, true);
+            history.push({role: 'assistant', content: data.reply || ''});
+        })
+        .catch(function (err) {
+            setLoading(false);
+            addMsg('error', 'Network error — could not reach the server. ' + err.message);
+        });
+    }
+
+    sendBtn.addEventListener('click', send);
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+
+    function addMsg(type, content, isHtml) {
+        var div = document.createElement('div');
+        div.className = 'oroai-dw-msg ' + type;
+        if (isHtml) div.innerHTML = content;
+        else div.textContent = content;
+        msgs.appendChild(div);
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function setLoading(on) {
+        sendBtn.disabled = on;
+        input.disabled = on;
+        var ld = msgs.querySelector('.oroai-dw-loading');
+        if (on && !ld) {
+            var d = document.createElement('div');
+            d.className = 'oroai-dw-loading';
+            d.textContent = 'Thinking…';
+            msgs.appendChild(d);
+            msgs.scrollTop = msgs.scrollHeight;
+        } else if (!on && ld) {
+            ld.remove();
+        }
+    }
+}());
+</script>
+
+</div>
