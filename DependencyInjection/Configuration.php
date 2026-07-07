@@ -31,6 +31,7 @@ class Configuration implements ConfigurationInterface
                 'model' => ['type' => 'scalar', 'value' => null],
                 'temperature' => ['type' => 'scalar', 'value' => 0.3],
                 'max_iterations' => ['type' => 'scalar', 'value' => 5],
+                'max_retries' => ['type' => 'scalar', 'value' => 0],
                 'embedding_api_key' => ['type' => 'scalar', 'value' => null],
                 'embedding_url' => ['type' => 'scalar', 'value' => null],
                 'embedding_model' => ['type' => 'scalar', 'value' => 'text-embedding-3-small'],

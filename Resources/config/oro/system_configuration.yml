@@ -2,7 +2,7 @@ system_configuration:
   groups:
     genaker_oroai_group:
       title: 'Oro AI Assistant'
-      icon: 'fa-robot'
+      icon: 'fa-magic'
       page_reload: false
 
     genaker_oroai_settings:
@@ -87,6 +87,18 @@ system_configuration:
         attr:
           placeholder: '5'
       priority: 75
+
+    genaker_oro_ai.max_retries:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'API Retry Attempts'
+        tooltip: 'Retries on 429 rate-limit errors with exponential backoff (0 = disabled, max 5). Each retry doubles the wait: 0.5s → 1s → 2s → 4s → 8s.'
+        required: false
+        attr:
+          placeholder: '0'
+      priority: 72
 
     genaker_oro_ai.embedding_api_key:
       data_type: string
@@ -286,6 +298,7 @@ system_configuration:
                       - genaker_oro_ai.model
                       - genaker_oro_ai.temperature
                       - genaker_oro_ai.max_iterations
+                      - genaker_oro_ai.max_retries
                       - genaker_oro_ai.embedding_api_key
                       - genaker_oro_ai.embedding_url
                       - genaker_oro_ai.embedding_model

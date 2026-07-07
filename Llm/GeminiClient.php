@@ -69,11 +69,21 @@ final class GeminiClient implements LlmClientInterface
             ];
         }
 
-        $response = $this->httpClient->request('POST', $url, [
-            'headers' => ['Content-Type' => 'application/json'],
-            'json' => $body,
-            'timeout' => 60,
-        ]);
+        $retryDelays = $this->buildRetryDelays($this->config->getMaxRetries());
+        $response = null;
+        foreach ([null, ...$retryDelays] as $delay) {
+            if ($delay !== null) {
+                usleep($delay);
+            }
+            $response = $this->httpClient->request('POST', $url, [
+                'headers' => ['Content-Type' => 'application/json'],
+                'json' => $body,
+                'timeout' => 60,
+            ]);
+            if ($response->getStatusCode() !== 429) {
+                break;
+            }
+        }
 
         $data = $response->toArray();
         $candidate = $data['candidates'][0];
@@ -145,6 +155,17 @@ final class GeminiClient implements LlmClientInterface
             'description' => $tool->description,
             'parameters' => $tool->parameters,
         ];
+    }
+
+    /** @return int[] microsecond delays: 500ms, 1s, 2s, 4s, 8s … up to $count entries */
+    private function buildRetryDelays(int $count): array
+    {
+        $delays = [];
+        for ($i = 0; $i < $count; $i++) {
+            $delays[] = 500_000 * (2 ** $i);
+        }
+
+        return $delays;
     }
 
     private function generateUuid(): string

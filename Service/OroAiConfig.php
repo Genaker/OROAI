@@ -15,6 +15,7 @@ class OroAiConfig
     private const string KEY_MODEL             = 'genaker_oro_ai.model';
     private const string KEY_TEMPERATURE       = 'genaker_oro_ai.temperature';
     private const string KEY_MAX_ITERATIONS    = 'genaker_oro_ai.max_iterations';
+    private const string KEY_MAX_RETRIES       = 'genaker_oro_ai.max_retries';
     private const string KEY_EMBEDDING_API_KEY = 'genaker_oro_ai.embedding_api_key';
     private const string KEY_EMBEDDING_URL     = 'genaker_oro_ai.embedding_url';
     private const string KEY_EMBEDDING_MODEL   = 'genaker_oro_ai.embedding_model';
@@ -99,6 +100,11 @@ class OroAiConfig
     public function getMaxIterations(): int
     {
         return (int) ($this->configManager->get(self::KEY_MAX_ITERATIONS) ?? 5);
+    }
+
+    public function getMaxRetries(): int
+    {
+        return min(5, (int) ($this->configManager->get(self::KEY_MAX_RETRIES) ?? 0));
     }
 
     public function getEmbeddingApiKey(): string

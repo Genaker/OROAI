@@ -2,6 +2,8 @@
 
 AI assistant for OroCommerce. Adds a chat input to the admin header that connects to a configurable LLM backend, with tool use (SQL queries, entity lookup, schema inspection, config reading) and a RAG knowledge base backed by Redis Stack.
 
+![Oro AI Assistant — System Configuration](docs/configuration.png)
+
 ---
 
 ## Features

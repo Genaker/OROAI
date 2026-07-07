@@ -31,15 +31,24 @@ final class GeminiEmbeddingClient implements EmbeddingClientInterface
     public function embed(string $text): array
     {
         [$model, $apiKey] = $this->modelAndKey();
-        $url = self::BASE_URL . $model . ':embedContent?key=' . $apiKey;
-
-        $response = $this->httpClient->request('POST', $url, [
+        $url     = self::BASE_URL . $model . ':embedContent?key=' . $apiKey;
+        $options = [
             'headers' => ['Content-Type' => 'application/json'],
             'json'    => ['content' => ['parts' => [['text' => $text]]]],
             'timeout' => 30,
-        ]);
+        ];
 
-        return $response->toArray()['embedding']['values'];
+        $delay = 5;
+        for ($attempt = 0; $attempt <= 3; $attempt++) {
+            $response = $this->httpClient->request('POST', $url, $options);
+            if ($response->getStatusCode() !== 429 || $attempt === 3) {
+                return $response->toArray()['embedding']['values'];
+            }
+            sleep($delay);
+            $delay *= 2;
+        }
+
+        throw new \RuntimeException('Gemini embed: exhausted retries');
     }
 
     public function embedBatch(array $texts): array
