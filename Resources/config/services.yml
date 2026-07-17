@@ -248,6 +248,11 @@ services:
       $userManager: '@oro_user.manager'
     tags: ['console.command']
 
+  Genaker\Bundle\OroAI\Command\ChatCommand:
+    arguments:
+      $configManager: '@oro_config.manager'
+    tags: ['console.command']
+
   # Controller
   Genaker\Bundle\OroAI\Controller\ChatController:
     public: true

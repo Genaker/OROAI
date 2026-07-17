@@ -262,7 +262,9 @@ GenakerOroAIBundle/
 │                       # ResearchSubAgent — independent loop for delegated deep-dives
 │                       # ChatProgressStore — live "what is it doing" checklist backing store
 │                       # ContextWindowManager — trims loaded history to a token budget
-├── Command/            # Console commands (rag:reindex, rag:test)
+├── Command/            # ChatCommand — terminal chat client (same ChatOrchestrator as the web widget)
+│                       # LiveStatusLine — terminal counterpart of the widget's live tool checklist
+│                       # rag:reindex, rag:test
 ├── Controller/         # ChatController — thin HTTP layer (parse → ChatOrchestrator → JSON)
 ├── Core/
 │   ├── Model/          # Provider-agnostic DTOs: ChatMessage, LlmRequest/Response, ChatOutcome
@@ -333,6 +335,7 @@ See **[RAG.md](RAG.md)** for:
 
 | Command | Description |
 |---------|-------------|
+| `genaker:oroai:chat [message]` | Terminal chat client — same agent/harness/tools/RAG as the web widget (see below) |
 | `genaker:oroai:rag:reindex` | Rebuild the vector index from all (or selected) providers |
 | `genaker:oroai:rag:test <query>` | Search the index and show scores — useful for debugging relevance |
 
@@ -350,6 +353,41 @@ php bin/console genaker:oroai:rag:reindex --clear
 php bin/console genaker:oroai:rag:test "checkout configuration" --top=5
 php bin/console genaker:oroai:rag:test "checkout configuration" -k 1 --full
 ```
+
+### Terminal chat (`genaker:oroai:chat`)
+
+A second front end onto the exact same `ChatOrchestrator` the web widget's `/admin/oroai/chat/message`
+endpoint calls — same agent/harness loop, same tools, same RAG, same token/cost accounting. Not a
+reimplementation: ask the same question either way and get the same answer.
+
+```bash
+# Interactive REPL
+php bin/console genaker:oroai:chat --current-user=admin
+
+# One-shot — ask once, print the reply, exit (script-friendly; non-zero exit on error)
+php bin/console genaker:oroai:chat "where are customer users?" --current-user=admin
+
+# Resume a specific conversation (same session id shown in the web widget / debug transcripts)
+php bin/console genaker:oroai:chat --current-user=admin --session=m1x3k9a7f2b4
+```
+
+`--current-user` is Oro's own global console option (every command gets it, resolved before
+`execute()` runs) — pass it to get an ACL-aware security context, which is what lets
+`ChatSessionStore` persist the conversation (so it also shows up in the web widget's *Recent
+chats*, and vice versa: `--session=<id>` can resume a conversation started in the browser).
+Without it the assistant still answers, it just runs anonymously and nothing is saved.
+
+In-REPL commands: `/new` (start a fresh conversation), `/clear` (clear the screen and start a
+fresh conversation — the CLI counterpart of the widget's Clear button), `/sessions` (list recent
+conversations — same list the widget's Recent chats panel shows), `/resume <id>` (switch to a
+different conversation by session id — pairs with `/sessions`), `/id` (print the current session
+id), `/help`, `/exit`/`/quit` (Ctrl+D also works). Admin paths in a reply (`/admin/...`, even
+backtick-quoted) render as real clickable terminal hyperlinks (OSC 8) resolved against the
+**Application URL** system setting — plain text on terminals/output that don't support it. Each
+reply shows the same tool trace and token/cost breakdown as the widget's token bar, rendered as
+plain text; a live status line (`⠋ running sql_query`, `⠙ attempt 2/10`, …) redraws in place
+while a turn is in flight —
+the terminal counterpart of the widget's rotating "thinking…" word and tool checklist.
 
 ---
 
