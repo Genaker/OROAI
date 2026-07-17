@@ -9,6 +9,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
+/** AI tool that looks up OroCommerce translation keys and returns their translated text. */
 final class TranslationTool implements AiToolInterface
 {
     public function __construct(

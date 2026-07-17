@@ -17,6 +17,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
     name: 'genaker:oroai:rag:test',
     description: 'Search the RAG index with a text query and show matching documents with scores',
 )]
+/** Console command to test the RAG index by running a similarity search and displaying results. */
 final class RagTestCommand extends Command
 {
     public function __construct(
@@ -48,6 +49,9 @@ final class RagTestCommand extends Command
             );
     }
 
+    /**
+     * @SuppressWarnings(PHPMD.Superglobals)
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io    = new SymfonyStyle($input, $output);
@@ -74,11 +78,17 @@ final class RagTestCommand extends Command
         }
 
         $elapsed = round((microtime(true) - $start) * 1000);
-        $io->text(sprintf('Search completed in <info>%d ms</info> — <info>%d</info> hit(s) found.', $elapsed, count($hits)));
+        $io->text(sprintf(
+            'Search completed in <info>%d ms</info> — <info>%d</info> hit(s) found.',
+            $elapsed,
+            count($hits),
+        ));
         $io->newLine();
 
         if ($hits === []) {
-            $io->warning('No documents matched. Try reindexing: genaker:oroai:rag:reindex --provider=docs --provider=config');
+            $io->warning(
+                'No documents matched. Try reindexing: genaker:oroai:rag:reindex --provider=docs --provider=config'
+            );
 
             return Command::SUCCESS;
         }

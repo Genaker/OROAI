@@ -137,6 +137,8 @@ final class OpenAiClientTest extends TestCase
         self::assertSame('The answer is 42.', $response->content);
         self::assertSame([], $response->toolCalls);
         self::assertSame('stop', $response->finishReason);
+        self::assertSame(5, $response->usage['prompt_tokens']);
+        self::assertSame(10, $response->usage['completion_tokens']);
         self::assertSame(15, $response->usage['total_tokens']);
     }
 

@@ -16,7 +16,8 @@ final class ProviderAwareEmbeddingClient implements EmbeddingClientInterface
         private readonly OpenAiEmbeddingClient $openai,
         private readonly GeminiEmbeddingClient $gemini,
         private readonly OroAiConfig $config,
-    ) {}
+    ) {
+    }
 
     public function embed(string $text): array
     {

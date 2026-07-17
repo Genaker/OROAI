@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Genaker\Bundle\OroAI\Rag;
 
+/** Splits long text into paragraph-aware chunks suitable for embedding. */
 final class TextChunker
 {
     private const int MAX_CHUNK_LENGTH = 500;

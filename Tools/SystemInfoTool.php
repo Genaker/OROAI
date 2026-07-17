@@ -8,6 +8,7 @@ use Genaker\Bundle\OroAI\Core\Contract\AiToolInterface;
 use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 
+/** AI tool that reports system environment information such as PHP version and memory usage. */
 final class SystemInfoTool implements AiToolInterface
 {
     public function __construct(
@@ -54,6 +55,9 @@ final class SystemInfoTool implements AiToolInterface
         };
     }
 
+    /**
+     * @SuppressWarnings(PHPMD.Superglobals)
+     */
     private function overview(): ToolResult
     {
         return ToolResult::success([

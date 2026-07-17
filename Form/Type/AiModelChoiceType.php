@@ -10,6 +10,7 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Yaml\Yaml;
 
+/** Symfony form type that renders a grouped choice list of available AI models from a YAML file. */
 class AiModelChoiceType extends AbstractType
 {
     public function __construct(private readonly string $modelsFile)

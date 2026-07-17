@@ -8,6 +8,7 @@ use Genaker\Bundle\OroAI\Core\Contract\AiToolInterface;
 use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 
+/** AI tool that reads and searches OroCommerce log files for diagnostic information. */
 final class LogReaderTool implements AiToolInterface
 {
     public function __construct(
@@ -131,9 +132,11 @@ final class LogReaderTool implements AiToolInterface
 
         fseek($handle, max(0, filesize($path) - 1024 * 1024));
 
-        while (($line = fgets($handle)) !== false && count($matches) < $limit) {
+        $matchCount = 0;
+        while (($line = fgets($handle)) !== false && $matchCount < $limit) {
             if (str_contains(strtolower($line), $patternLower)) {
                 $matches[] = rtrim($line);
+                $matchCount++;
             }
         }
         fclose($handle);

@@ -1,5 +1,14 @@
+{% extends '@OroDashboard/Dashboard/widget.html.twig' %}
+
+{% set widgetType = 'oroai-chat' %}
+
+{% block content %}
 <div class="oroai-dw"
+     id="oroai-dw-root"
      data-message-url="{{ path('genaker_oroai_chat_message') }}"
+     data-progress-url="{{ path('genaker_oroai_chat_progress') }}"
+     data-sessions-url="{{ path('genaker_oroai_chat_sessions') }}"
+     data-session-url="{{ path('genaker_oroai_chat_session') }}"
      data-csrf-token="{{ csrf_token('') }}">
 
 <style>
@@ -9,20 +18,56 @@
 .oroai-dw-bar-btns{display:flex;gap:4px}
 .oroai-dw-bar-btns button{background:none;border:none;color:#fff;cursor:pointer;opacity:.8;padding:2px 5px;font-size:13px;line-height:1}
 .oroai-dw-bar-btns button:hover{opacity:1}
+.oroai-dw-tokens{font-size:10px;font-weight:400;color:#e3f2fd}
+.oroai-dw-tokenbar{display:flex;align-items:center;gap:4px;padding:5px 2px 1px;white-space:nowrap;overflow-x:auto;scrollbar-width:thin}
+.oroai-tokenbar-chip{display:inline-flex;align-items:center;gap:4px;flex:none;padding:2px 7px;border-radius:10px;background:#f1f3f5;border:1px solid #e6e9ec;color:#5f6b76;font-size:10px;line-height:1.4;cursor:help;transition:background .15s}
+.oroai-tokenbar-chip:hover{background:#e9edf2}
+.oroai-tokenbar-val{font-weight:600;color:#37424c;font-variant-numeric:tabular-nums}
+.oroai-tokenbar-div{width:1px;height:14px;background:#dde1e6;margin:0 4px;flex:none}
+.oroai-tokenbar-cost{background:#e8f5e9;border-color:#c8e6c9;color:#2e7d32}
+.oroai-tokenbar-cost:hover{background:#dcefdd}
+.oroai-tokenbar-cost .oroai-tokenbar-val{color:#1b5e20}
+.oroai-sessions{padding:4px 2px 2px}
+.oroai-sessions-title{font-size:9px;font-weight:600;color:#9aa5b0;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 3px}
+.oroai-session-row{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:6px;font-size:11px;color:#5f6b76;cursor:pointer}
+.oroai-session-row:hover{background:#eef2f6;color:#2f3a44}
+.oroai-session-row.active{background:#e3f2fd;color:#1a5da8}
+.oroai-session-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oroai-session-time{flex:none;font-size:9px;color:#a5aeb7}
 .oroai-dw-msgs{max-height:300px;overflow-y:auto;padding:10px;background:#fafafa;border:1px solid #e8e8e8;border-top:0;border-radius:0 0 4px 4px}
-.oroai-dw-msg{margin-bottom:7px;padding:6px 10px;border-radius:8px;font-size:12px;line-height:1.45;max-width:90%;word-wrap:break-word}
-.oroai-dw-msg.user{background:#e3f2fd;margin-left:auto;text-align:right}
-.oroai-dw-msg.assistant{background:#fff;border:1px solid #e0e0e0;margin-right:auto}
-.oroai-dw-msg.error{background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;margin-right:auto}
-.oroai-dw-msg a{color:#1a73e8;text-decoration:underline}
-.oroai-dw-msg .oroai-trace{font-size:10px;color:#9e9e9e;margin-top:3px;border-top:1px solid #f0f0f0;padding-top:2px}
-.oroai-dw-loading{text-align:center;padding:5px;color:#9e9e9e;font-size:11px;font-style:italic}
+.oroai-hc-msg{margin-bottom:7px;padding:6px 10px;border-radius:8px;font-size:12px;line-height:1.45;max-width:90%;word-wrap:break-word}
+.oroai-hc-msg.user{background:#e3f2fd;margin-left:auto;text-align:right}
+.oroai-hc-msg.assistant{background:#fff;border:1px solid #e0e0e0;margin-right:auto}
+.oroai-hc-msg.error{background:#ffebee;color:#b71c1c;border:1px solid #ffcdd2;margin-right:auto}
+.oroai-hc-msg a{color:#1a73e8;text-decoration:underline}
+.oroai-hc-msg .oroai-trace{font-size:10px;color:#9e9e9e;margin-top:3px;border-top:1px solid #f0f0f0;padding-top:2px}
+.oroai-trace-tool{cursor:help;border-bottom:1px dotted #b0b0b0}
+.oroai-hc-msg .oroai-list{margin:4px 0 4px 0;padding-left:18px}
+.oroai-hc-msg .oroai-list li{margin:2px 0}
+.oroai-hc-msg code{background:#f0f0f0;border:1px solid #e0e0e0;border-radius:3px;padding:0 3px;font-size:11px}
+.oroai-hc-msg .oroai-code{background:#f6f6f6;border:1px solid #e0e0e0;border-radius:5px;padding:6px 8px;margin:4px 0;overflow-x:auto;white-space:pre-wrap;font-size:11px}
+.oroai-error-details{margin-top:5px}
+.oroai-error-details summary{cursor:pointer;font-size:10px;color:inherit;opacity:.75;user-select:none}
+.oroai-error-details summary:hover{opacity:1}
+.oroai-error-details .oroai-code{color:#444}
+.oroai-hc-msg .oroai-usage{font-size:10px;color:#b0b0b0;margin-top:3px}
+.oroai-hc-loading{text-align:center;padding:5px;color:#9e9e9e;font-size:11px;font-style:italic}
+@keyframes oroai-fade-in{from{opacity:.35}to{opacity:1}}
+.oroai-hc-loading--pulse{animation:oroai-fade-in .35s ease-out}
 .oroai-dw-notice{padding:7px 10px;border-radius:4px;margin-bottom:8px;font-size:12px}
 .oroai-dw-notice.warning{background:#fff8e1;border:1px solid #ffe082;color:#5d4037}
 .oroai-dw-notice a{color:inherit;text-decoration:underline}
 .oroai-dw-input-row{display:flex;gap:6px}
 .oroai-dw-input{flex:1;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:12px;outline:none}
 .oroai-dw-input:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.15)}
+.oroai-checklist{list-style:none;margin:4px 0;padding:6px 10px;background:#fff;border:1px solid #e0e0e0;border-radius:8px;max-width:90%;font-size:11px}
+.oroai-checklist li{display:flex;align-items:center;gap:6px;padding:2px 0;color:#777}
+.oroai-checklist li .oroai-checklist-icon{width:12px;flex-shrink:0;text-align:center}
+.oroai-checklist li.pending .oroai-checklist-icon::before{content:'⏳'}
+.oroai-checklist li.done .oroai-checklist-icon::before{content:'✓';color:#2e7d32}
+.oroai-checklist li.error .oroai-checklist-icon::before{content:'✗';color:#c62828}
+.oroai-checklist li.done{color:#444}
+.oroai-checklist li.error{color:#c62828}
 </style>
 
 {% if not configured %}
@@ -35,132 +80,41 @@
 {% endif %}
 
 {# messages body — hidden until first send #}
-<div class="oroai-dw-body">
+<div class="oroai-dw-body" id="oroai-dw-body">
     <div class="oroai-dw-bar">
-        <span>AI Assistant</span>
+        <span>AI Assistant <span id="oroai-dw-tokens" class="oroai-dw-tokens"></span></span>
         <div class="oroai-dw-bar-btns">
-            <button type="button" class="oroai-dw-minimize" title="Minimize" aria-label="Minimize">
+            <button type="button" id="oroai-dw-minimize" title="Minimize" aria-label="Minimize">
                 <span class="fa-minus" aria-hidden="true"></span>
             </button>
-            <button type="button" class="oroai-dw-clear" title="Clear conversation" aria-label="Clear">
+            <button type="button" id="oroai-dw-clear" title="Clear conversation" aria-label="Clear">
                 <span class="fa-trash-o" aria-hidden="true"></span>
             </button>
         </div>
     </div>
-    <div class="oroai-dw-msgs"></div>
+    <div class="oroai-dw-msgs" id="oroai-dw-msgs"></div>
 </div>
 
 {# input — always visible #}
 <div class="oroai-dw-input-row">
     <input type="text"
            class="oroai-dw-input"
+           id="oroai-dw-input"
            placeholder="Ask about OroCommerce…"
            autocomplete="off"
            {% if not configured %}disabled{% endif %} />
     <button type="button"
             class="btn btn-primary btn-sm oroai-dw-send"
+            id="oroai-dw-send"
             {% if not configured %}disabled{% endif %}>
         <span class="fa-paper-plane" aria-hidden="true"></span> Send
     </button>
 </div>
+<div id="oroai-dw-tokenbar" class="oroai-dw-tokenbar" style="display:none"></div>
+<div id="oroai-dw-sessions" class="oroai-sessions" style="display:none"></div>
 
-<script>
-(function () {
-    var root = document.currentScript.parentElement;
-    if (!root || !root.classList.contains('oroai-dw')) return;
-
-    var messageUrl  = root.dataset.messageUrl;
-    var csrfToken   = root.dataset.csrfToken;
-    var body        = root.querySelector('.oroai-dw-body');
-    var msgs        = root.querySelector('.oroai-dw-msgs');
-    var minimizeBtn = root.querySelector('.oroai-dw-minimize');
-    var clearBtn    = root.querySelector('.oroai-dw-clear');
-    var input       = root.querySelector('.oroai-dw-input');
-    var sendBtn     = root.querySelector('.oroai-dw-send');
-
-    var history = [];
-
-    function expand() { body.style.display = 'block'; }
-    function collapse() { body.style.display = 'none'; }
-
-    minimizeBtn.addEventListener('click', collapse);
-    clearBtn.addEventListener('click', function () {
-        history = [];
-        msgs.innerHTML = '';
-        collapse();
-    });
-
-    function send() {
-        var msg = input.value.trim();
-        if (!msg || sendBtn.disabled) return;
-
-        expand();
-        input.value = '';
-        addMsg('user', msg);
-        history.push({role: 'user', content: msg});
-        setLoading(true);
-
-        fetch(messageUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({message: msg, history: history.slice(-20)})
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            setLoading(false);
-            if (data.error) {
-                addMsg('error', data.error);
-                return;
-            }
-            var reply = (data.reply || 'No response.')
-                .replace(/(\/admin\/[^\s<>"']+)/g, '<a href="$1">$1</a>');
-            var trace = data.tool_trace || [];
-            var traceHtml = trace.length
-                ? '<div class="oroai-trace">Tools: ' + trace.map(function (t) { return t.tool; }).join(', ') + '</div>'
-                : '';
-            addMsg('assistant', reply + traceHtml, true);
-            history.push({role: 'assistant', content: data.reply || ''});
-        })
-        .catch(function (err) {
-            setLoading(false);
-            addMsg('error', 'Network error — could not reach the server. ' + err.message);
-        });
-    }
-
-    sendBtn.addEventListener('click', send);
-    input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-    });
-
-    function addMsg(type, content, isHtml) {
-        var div = document.createElement('div');
-        div.className = 'oroai-dw-msg ' + type;
-        if (isHtml) div.innerHTML = content;
-        else div.textContent = content;
-        msgs.appendChild(div);
-        msgs.scrollTop = msgs.scrollHeight;
-    }
-
-    function setLoading(on) {
-        sendBtn.disabled = on;
-        input.disabled = on;
-        var ld = msgs.querySelector('.oroai-dw-loading');
-        if (on && !ld) {
-            var d = document.createElement('div');
-            d.className = 'oroai-dw-loading';
-            d.textContent = 'Thinking…';
-            msgs.appendChild(d);
-            msgs.scrollTop = msgs.scrollHeight;
-        } else if (!on && ld) {
-            ld.remove();
-        }
-    }
-}());
-</script>
+<script src="{{ asset('bundles/genakeroroai/js/oroai-chat.js') }}"></script>
+<script>window.initOroAiChat({idPrefix: 'oroai-dw', mode: 'inline'});</script>
 
 </div>
+{% endblock %}

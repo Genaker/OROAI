@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Genaker\Bundle\OroAI\Core\Model;
 
+/** Represents a single message in a multi-turn LLM conversation. */
 final readonly class ChatMessage
 {
     /**
@@ -15,7 +16,8 @@ final readonly class ChatMessage
         public ?string $toolCallId = null,
         public ?string $name = null,
         public array $toolCalls = [],
-    ) {}
+    ) {
+    }
 
     public static function system(string $content): self
     {

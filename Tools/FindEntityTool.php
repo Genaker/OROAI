@@ -10,6 +10,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
+/** AI tool that searches OroCommerce entities by field value and returns records with admin URLs. */
 final class FindEntityTool implements AiToolInterface
 {
     private const ENTITY_CLASSES = [
@@ -47,7 +48,9 @@ final class FindEntityTool implements AiToolInterface
     {
         return new ToolDefinition(
             'find_entity',
-            'Find OroCommerce entities by field value. Returns matching records with their admin URLs.',
+            'Find OroCommerce entities by field value. Returns matching records with their admin URLs. '
+            . 'Use when asked about specific data, e.g. "do I have a user with email X" — prefer this or sql_query '
+            . 'over guessing an answer.',
             [
                 'type' => 'object',
                 'properties' => [
@@ -114,6 +117,7 @@ final class FindEntityTool implements AiToolInterface
                     try {
                         $url = $this->urlGenerator->generate($viewRoute, ['id' => $id], UrlGeneratorInterface::ABSOLUTE_PATH);
                     } catch (\Throwable) {
+                        // intentional
                     }
                 }
 
@@ -143,6 +147,7 @@ final class FindEntityTool implements AiToolInterface
                 try {
                     return (string) $entity->$method();
                 } catch (\Throwable) {
+                    // intentional
                 }
             }
         }

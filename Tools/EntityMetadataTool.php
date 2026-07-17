@@ -10,6 +10,7 @@ use Genaker\Bundle\OroAI\Core\Contract\AiToolInterface;
 use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 
+/** AI tool that introspects OroCommerce entity metadata — fields, types, and associations. */
 final class EntityMetadataTool implements AiToolInterface
 {
     private const ENTITY_ALIASES = [

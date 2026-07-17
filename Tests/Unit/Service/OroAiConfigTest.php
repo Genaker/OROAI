@@ -22,6 +22,7 @@ final class OroAiConfigTest extends TestCase
     private const array ENV_VARS = [
         'OROAI_PROVIDER', 'OROAI_API_KEY', 'OROAI_MODEL',
         'OROAI_API_URL', 'OROAI_EMBEDDING_API_KEY', 'OROAI_REDIS_URL',
+        'OROAI_CUSTOM_INSTRUCTIONS',
     ];
 
     protected function setUp(): void
@@ -182,6 +183,44 @@ final class OroAiConfigTest extends TestCase
         self::assertSame(5, $this->config->getRagTopK());
     }
 
+    public function testGetCustomInstructionsDefaultEmpty(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.custom_instructions')
+            ->willReturn(null);
+
+        self::assertSame('', $this->config->getCustomInstructions());
+    }
+
+    public function testGetCustomInstructionsFromConfig(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.custom_instructions')
+            ->willReturn('Always refer to customers as "accounts".');
+
+        self::assertSame('Always refer to customers as "accounts".', $this->config->getCustomInstructions());
+    }
+
+    public function testGetCustomInstructionsTrimsWhitespace(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.custom_instructions')
+            ->willReturn("  Be concise.  \n");
+
+        self::assertSame('Be concise.', $this->config->getCustomInstructions());
+    }
+
+    public function testGetCustomInstructionsEnvVarOverridesConfig(): void
+    {
+        $_SERVER['OROAI_CUSTOM_INSTRUCTIONS'] = 'From env var.';
+
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.custom_instructions')
+            ->willReturn('From DB config.');
+
+        self::assertSame('From env var.', $this->config->getCustomInstructions());
+    }
+
     public function testIsLearningEnabledDefault(): void
     {
         $this->configManager->method('get')
@@ -221,6 +260,65 @@ final class OroAiConfigTest extends TestCase
     public function testIsToolEnabledReturnsTrueForUnknownTool(): void
     {
         self::assertTrue($this->config->isToolEnabled('nonexistent_tool'));
+    }
+
+    /**
+     * Regression guard: the research tool is the one exception to "every
+     * tool defaults to enabled" -- spawning a whole extra sub-agent
+     * tool-calling loop per call is opt-in, not on by default.
+     */
+    public function testIsToolEnabledReturnsFalseByDefaultForResearch(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.tool_research_enabled')
+            ->willReturn(null);
+
+        self::assertFalse($this->config->isToolEnabled('research'));
+    }
+
+    public function testIsToolEnabledReturnsTrueForResearchWhenExplicitlyEnabled(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.tool_research_enabled')
+            ->willReturn(true);
+
+        self::assertTrue($this->config->isToolEnabled('research'));
+    }
+
+    public function testIsToolEnabledReturnsFalseForResearchWhenExplicitlyDisabled(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.tool_research_enabled')
+            ->willReturn(false);
+
+        self::assertFalse($this->config->isToolEnabled('research'));
+    }
+
+    public function testGetResearchMaxIterationsDefault(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.research_max_iterations')
+            ->willReturn(null);
+
+        self::assertSame(8, $this->config->getResearchMaxIterations());
+    }
+
+    public function testGetResearchMaxIterationsFromConfig(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.research_max_iterations')
+            ->willReturn(12);
+
+        self::assertSame(12, $this->config->getResearchMaxIterations());
+    }
+
+    public function testGetResearchMaxIterationsEnforcesMinimumOfOne(): void
+    {
+        $this->configManager->method('get')
+            ->with('genaker_oro_ai.research_max_iterations')
+            ->willReturn(0);
+
+        self::assertSame(1, $this->config->getResearchMaxIterations());
     }
 
     public function testIsToolEnabledAllKnownTools(): void

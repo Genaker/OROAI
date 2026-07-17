@@ -8,6 +8,7 @@ use Doctrine\DBAL\Connection;
 use Genaker\Bundle\OroAI\Rag\Contract\RagProviderInterface;
 use Genaker\Bundle\OroAI\Rag\RagDocument;
 
+/** Provides RAG documents by reading the database schema from information_schema. */
 final class SchemaRagProvider implements RagProviderInterface
 {
     public function __construct(private readonly Connection $connection)

@@ -8,11 +8,27 @@ use Genaker\Bundle\OroAI\Core\Contract\AiToolInterface;
 use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Oro\Bundle\ConfigBundle\Config\ConfigManager;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
+/** AI tool that reads OroCommerce system configuration values by key or keyword search. */
 final class ConfigInspectorTool implements AiToolInterface
 {
+    /**
+     * Where each config section is edited in the admin UI:
+     * prefix => [activeGroup, activeSubGroup] of the oro_config_configuration_system
+     * route (the tree placement from each bundle's system_configuration.yml).
+     * The URL is returned as settings_url so the assistant can answer "where do I
+     * change this?" with a clickable admin link.
+     */
+    private const array SETTINGS_PAGES = [
+        'genaker_oro_ai'       => ['general_setup', 'genaker_oroai_group'],
+        'genaker_log_viewer'   => ['general_setup', 'genaker_log_viewer_group'],
+        'genaker_comi_voyager' => ['general_setup', 'comivoyager_settings'],
+    ];
+
     public function __construct(
         private readonly ConfigManager $configManager,
+        private readonly UrlGeneratorInterface $urlGenerator,
     ) {
     }
 
@@ -65,11 +81,19 @@ final class ConfigInspectorTool implements AiToolInterface
         try {
             $value = $this->configManager->get($key);
 
-            return ToolResult::success([
+            $data = [
                 'key' => $key,
                 'value' => $this->sanitizeValue($value),
                 'type' => get_debug_type($value),
-            ]);
+            ];
+
+            $settingsUrl = $this->settingsUrl($key);
+            if ($settingsUrl !== null) {
+                $data['settings_url'] = $settingsUrl;
+                $data['settings_url_note'] = 'Admin page where this setting is edited — include this URL in your answer.';
+            }
+
+            return ToolResult::success($data);
         } catch (\Throwable $e) {
             return ToolResult::error('Config key not found or error: ' . $e->getMessage());
         }
@@ -109,15 +133,56 @@ final class ConfigInspectorTool implements AiToolInterface
                     $value = $this->configManager->get($key);
                     $matches[$key] = $this->sanitizeValue($value);
                 } catch (\Throwable) {
+                    // intentional
                 }
             }
         }
 
-        return ToolResult::success([
+        $settingsUrls = [];
+        foreach ($matchingPrefixes as $prefix) {
+            $settingsUrl = $this->settingsUrl($prefix);
+            if ($settingsUrl !== null) {
+                $settingsUrls[$prefix] = $settingsUrl;
+            }
+        }
+
+        // settings_urls FIRST: the tool trace stores a 500-char summary of this
+        // payload, and the link extractor for the chat widget only sees that
+        // summary — a URL after a large found_values map would be truncated away.
+        $data = [];
+        if ($settingsUrls !== []) {
+            $data['settings_urls'] = $settingsUrls;
+            $data['settings_url_note'] = 'Admin pages where these settings are edited — include the URL in your answer.';
+        }
+        $data += [
             'matching_prefixes' => array_values($matchingPrefixes),
             'found_values' => $matches,
             'count' => count($matches),
             'note' => 'Use "get" action with a specific key for exact lookup.',
+        ];
+
+        return ToolResult::success($data);
+    }
+
+    /**
+     * Admin system-config page URL for a config key or prefix, or null when the
+     * section has no known page mapping.
+     */
+    private function settingsUrl(string $keyOrPrefix): ?string
+    {
+        $prefix = str_contains($keyOrPrefix, '.')
+            ? substr($keyOrPrefix, 0, (int) strpos($keyOrPrefix, '.'))
+            : $keyOrPrefix;
+
+        if (!isset(self::SETTINGS_PAGES[$prefix])) {
+            return null;
+        }
+
+        [$group, $subGroup] = self::SETTINGS_PAGES[$prefix];
+
+        return $this->urlGenerator->generate('oro_config_configuration_system', [
+            'activeGroup' => $group,
+            'activeSubGroup' => $subGroup,
         ]);
     }
 

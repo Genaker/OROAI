@@ -1,0 +1,6 @@
+oro_ai:
+    skills:
+        md_skill:
+            description: 'Overridden trigger.'
+            body: 'Overridden body wins.'
+        doomed_skill: ~

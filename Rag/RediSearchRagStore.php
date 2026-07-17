@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Genaker\Bundle\OroAI\Rag;
 
+/** RAG store backed by Redis with RediSearch vector index and a brute-force cosine fallback. */
 final class RediSearchRagStore implements RagStoreInterface
 {
     private const string INDEX_NAME = 'oroai_rag';
@@ -63,6 +64,7 @@ final class RediSearchRagStore implements RagStoreInterface
             try {
                 $this->redis->executeRaw(['FT.DROPINDEX', self::INDEX_NAME, 'DD']);
             } catch (\Throwable) {
+                // intentional
             }
             $this->indexChecked = false;
             $this->createIndexIfNeeded();

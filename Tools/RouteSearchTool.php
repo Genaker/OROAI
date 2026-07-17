@@ -9,6 +9,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Symfony\Component\Routing\RouterInterface;
 
+/** AI tool that searches OroCommerce admin routes by keyword to find admin panel URLs. */
 final class RouteSearchTool implements AiToolInterface
 {
     public function __construct(
@@ -25,7 +26,9 @@ final class RouteSearchTool implements AiToolInterface
     {
         return new ToolDefinition(
             'route_search',
-            'Search OroCommerce admin routes by keyword. Use this to find the exact URL for a feature, admin page, or API endpoint.',
+            'Search OroCommerce admin routes by keyword. Use this to find the exact URL for a feature, admin page, or API endpoint. '
+            . 'Use when asked where to configure, set, enable, or manage something (e.g. "where do I set the shipping '
+            . 'condition", "where are the Oro AI settings") — don\'t guess a path from memory.',
             [
                 'type' => 'object',
                 'properties' => [

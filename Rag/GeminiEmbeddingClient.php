@@ -26,7 +26,8 @@ final class GeminiEmbeddingClient implements EmbeddingClientInterface
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly OroAiConfig $config,
-    ) {}
+    ) {
+    }
 
     public function embed(string $text): array
     {

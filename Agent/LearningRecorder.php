@@ -8,6 +8,7 @@ use Genaker\Bundle\OroAI\Rag\RagDocument;
 use Genaker\Bundle\OroAI\Rag\RagStoreInterface;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 
+/** Records successful SQL queries as RAG documents to improve future responses. */
 final class LearningRecorder
 {
     public function __construct(
@@ -42,6 +43,7 @@ final class LearningRecorder
         try {
             $this->ragStore->index([$doc]);
         } catch (\Throwable) {
+            // intentional
         }
     }
 }

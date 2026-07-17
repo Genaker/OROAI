@@ -208,15 +208,16 @@ test.describe('OroAI Chat widget — admin UI', () => {
 
     /**
      * Regression guard: a real multi-turn conversation through the widget's
-     * own JS, which accumulates `history` after every exchange
-     * (oroai-chat.js's `history.push(...)`) and sends it on the next
-     * message. The Role enum used to be defined inside ChatMessage.php with
-     * no file of its own, so it only autoloaded as a side effect of
-     * ChatMessage loading first -- something that happened on a
-     * conversation's first message (empty history) but not on any
-     * follow-up, where ChatController::parseHistory() hit Role::tryFrom()
-     * first and fataled with "Attempted to load class Role". A single-
-     * message test can't catch that; this one sends two.
+     * own JS. History used to be accumulated client-side and replayed on
+     * every request (oroai-chat.js's old `history.push(...)`); it is now
+     * loaded server-side by ChatOrchestrator from ChatSessionStore, keyed by
+     * the widget's session id, so the browser only ever sends the new
+     * message. This test's job is unchanged from when history was
+     * client-side: prove a second message in the same conversation still
+     * gets a reply and never a fatal error -- originally because the Role
+     * enum only autoloaded as a side effect of ChatMessage loading first,
+     * which a single-message test (empty history) couldn't catch. Kept as a
+     * regression guard for the conversation flow in general.
      */
     test('a second message in the same conversation still gets a reply, not a fatal error', async ({ page }) => {
         const pageErrors = [];
@@ -234,7 +235,9 @@ test.describe('OroAI Chat widget — admin UI', () => {
         await expect(reply.first()).toBeVisible({ timeout: 30000 });
         await expect(page.locator('.oroai-hc-loading')).toHaveCount(0, { timeout: 30000 });
 
-        // Second message -- the widget's JS now sends non-empty history.
+        // Second message -- the server resolves history itself from the
+        // session id already stamped on this conversation; the widget sends
+        // no history payload at all.
         await input.click();
         await input.fill('And what about orders?');
         await sendBtn.click();
@@ -250,5 +253,98 @@ test.describe('OroAI Chat widget — admin UI', () => {
         }
 
         expect(pageErrors).toEqual([]);
+    });
+
+    /**
+     * Token bar: after a successful reply, the footer under the messages
+     * should render at least one chip on each side (estimated prompt
+     * ingredients vs provider-reported usage) with a non-empty tooltip --
+     * locks in the DOM-node rewrite (tokenChip()) that replaced the old
+     * innerHTML-with-title-attribute version, which broke on any tooltip
+     * text containing a double quote (e.g. Gemini "thoughts").
+     */
+    test('a successful reply populates the token bar with chips and tooltips', async ({ page }) => {
+        await page.goto(ADMIN_DASHBOARD_URL);
+
+        const input = page.locator('#oroai-hc-input');
+        const sendBtn = page.locator('#oroai-hc-send');
+        const reply = page.locator('#oroai-hc-msgs .oroai-hc-msg.assistant, #oroai-hc-msgs .oroai-hc-msg.error');
+
+        await input.click();
+        await input.fill('hi');
+        await sendBtn.click();
+        await expect(reply.first()).toBeVisible({ timeout: 45000 });
+        await expect(page.locator('.oroai-hc-loading')).toHaveCount(0, { timeout: 45000 });
+
+        // A provider/API failure still renders as an error bubble (already
+        // covered above) but produces no usage to show -- skip in that case
+        // rather than asserting on a chat that never actually completed.
+        test.skip(
+            await page.locator('#oroai-hc-msgs .oroai-hc-msg.error').count() > 0,
+            'LLM provider unavailable in this environment -- no usage to render.',
+        );
+
+        const tokenBar = page.locator('#oroai-hc-tokenbar');
+        await expect(tokenBar).toBeVisible();
+
+        const chips = tokenBar.locator('.oroai-tokenbar-chip');
+        await expect(chips.first()).toBeVisible();
+        expect(await chips.count()).toBeGreaterThan(0);
+
+        // Every chip must carry a real, non-empty title -- the regression
+        // this guards against silently produced malformed `title="..."`
+        // markup (visible as stray attribute fragments like
+        // `additional="" guidelines"=""` in the rendered HTML) whenever a
+        // tooltip string contained a double quote.
+        const titles = await chips.evaluateAll((els) => els.map((el) => el.getAttribute('title')));
+        expect(titles.length).toBeGreaterThan(0);
+        for (const title of titles) {
+            expect(title).toBeTruthy();
+            expect(title).not.toMatch(/=""/);
+        }
+    });
+
+    /**
+     * Recent chats (resume): sending a message must add this conversation
+     * to the "Recent chats" list at the bottom of the widget, and clicking
+     * a different session there must swap the visible transcript to that
+     * session's own history -- the ChatSessionStore + restoreSession() flow
+     * added alongside server-side history.
+     */
+    test('a conversation appears in Recent chats and can be restored', async ({ page }) => {
+        await page.goto(ADMIN_DASHBOARD_URL);
+
+        const input = page.locator('#oroai-hc-input');
+        const sendBtn = page.locator('#oroai-hc-send');
+        const reply = page.locator('#oroai-hc-msgs .oroai-hc-msg.assistant, #oroai-hc-msgs .oroai-hc-msg.error');
+        const firstMessage = `Recent chats e2e probe ${Date.now()}`;
+
+        await input.click();
+        await input.fill(firstMessage);
+        await sendBtn.click();
+        await expect(reply.first()).toBeVisible({ timeout: 45000 });
+        await expect(page.locator('.oroai-hc-loading')).toHaveCount(0, { timeout: 45000 });
+
+        const sessions = page.locator('#oroai-hc-sessions');
+        await expect(sessions).toBeVisible();
+
+        const ownRow = sessions.locator('.oroai-session-row', { hasText: firstMessage });
+        await expect(ownRow).toBeVisible();
+        // The conversation currently open is always highlighted.
+        await expect(ownRow).toHaveClass(/active/);
+
+        // Clearing starts a brand new session id -- the just-sent
+        // conversation is no longer "active" but must still be listed, and
+        // clicking it must bring its transcript back into the message pane.
+        await page.locator('#oroai-hc-clear').click();
+        await expect(page.locator('#oroai-hc-msgs .oroai-hc-msg')).toHaveCount(0);
+
+        await expect(ownRow).toBeVisible();
+        await expect(ownRow).not.toHaveClass(/active/);
+
+        await ownRow.click();
+
+        await expect(page.locator('#oroai-hc-msgs .oroai-hc-msg.user').first()).toHaveText(firstMessage);
+        await expect(ownRow).toHaveClass(/active/);
     });
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Genaker\Bundle\OroAI\Core\Model;
 
+/** Wraps the outcome of a tool execution: success data or an error message. */
 final readonly class ToolResult
 {
     private const int SUMMARY_MAX_LENGTH = 500;
@@ -12,7 +13,8 @@ final readonly class ToolResult
         public bool $success,
         public mixed $data,
         public ?string $errorMessage = null,
-    ) {}
+    ) {
+    }
 
     public static function success(mixed $data): self
     {
@@ -43,7 +45,10 @@ final readonly class ToolResult
     {
         return json_encode(
             ['success' => $this->success, 'data' => $this->data, 'error' => $this->errorMessage],
-            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE,
+            // UNESCAPED_SLASHES: admin URLs in tool results ("/admin/...") must stay
+            // literal — OroAiAgent::extractLinks() regexes them out of this JSON, and
+            // escaped "\/admin\/..." never matches (links were always empty before).
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
         );
     }
 }

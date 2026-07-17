@@ -8,6 +8,7 @@ use Genaker\Bundle\OroAI\Rag\Contract\RagProviderInterface;
 use Genaker\Bundle\OroAI\Rag\RagDocument;
 use Symfony\Component\Routing\RouterInterface;
 
+/** Provides RAG documents from the Symfony admin router route collection. */
 final class MenuRagProvider implements RagProviderInterface
 {
     public function __construct(private readonly RouterInterface $router)

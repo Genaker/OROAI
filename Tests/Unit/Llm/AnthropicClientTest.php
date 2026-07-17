@@ -155,7 +155,9 @@ final class AnthropicClientTest extends TestCase
         self::assertSame('First part. Second part.', $response->content);
         self::assertSame([], $response->toolCalls);
         self::assertSame('end_turn', $response->finishReason);
-        self::assertSame(20, $response->usage['input_tokens']);
+        self::assertSame(20, $response->usage['prompt_tokens']);
+        self::assertSame(30, $response->usage['completion_tokens']);
+        self::assertSame(50, $response->usage['total_tokens']);
     }
 
     public function testChatParsesToolUseBlocks(): void

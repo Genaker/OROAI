@@ -1,0 +1,10 @@
+oro_ai:
+    skills:
+        yml_skill:
+            description: 'Use for the YAML fixture case.'
+            body: 'Step one from YAML.'
+        doomed_skill:
+            description: 'Will be removed by a later bundle.'
+            body: 'Should never survive.'
+        invalid_skill:
+            description: 'Has no body — must be skipped.'

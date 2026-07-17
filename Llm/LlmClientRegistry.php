@@ -7,6 +7,7 @@ namespace Genaker\Bundle\OroAI\Llm;
 use Genaker\Bundle\OroAI\Core\Contract\LlmClientInterface;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 
+/** Registry that holds all available LLM clients and resolves the active provider by config. */
 class LlmClientRegistry
 {
     /** @var array<string, LlmClientInterface> */

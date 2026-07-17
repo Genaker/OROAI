@@ -18,6 +18,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
     name: 'genaker:oroai:rag:reindex',
     description: 'Reindex the OroAI RAG knowledge base (docs, schema, menu, config, and any registered providers)',
 )]
+/** Console command to rebuild the OroAI RAG knowledge base from all registered providers. */
 final class RagReindexCommand extends Command
 {
     /** @param iterable<RagProviderInterface> $providers */
@@ -70,7 +71,11 @@ final class RagReindexCommand extends Command
 
         if ($toRun === []) {
             $available = implode(', ', array_keys($providerMap));
-            $io->error(sprintf('No matching providers found. Requested: %s. Available: %s', implode(', ', $requested), $available));
+            $io->error(sprintf(
+                'No matching providers found. Requested: %s. Available: %s',
+                implode(', ', $requested),
+                $available,
+            ));
 
             return Command::FAILURE;
         }

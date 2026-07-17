@@ -29,6 +29,8 @@ class Configuration implements ConfigurationInterface
                 'api_key' => ['type' => 'scalar', 'value' => null],
                 'api_url' => ['type' => 'scalar', 'value' => null],
                 'model' => ['type' => 'scalar', 'value' => null],
+                'custom_instructions' => ['type' => 'scalar', 'value' => null],
+                'additional_guidelines' => ['type' => 'scalar', 'value' => null],
                 'temperature' => ['type' => 'scalar', 'value' => 0.3],
                 'max_iterations' => ['type' => 'scalar', 'value' => 5],
                 'max_retries' => ['type' => 'scalar', 'value' => 0],
@@ -40,6 +42,9 @@ class Configuration implements ConfigurationInterface
                 'rag_enabled' => ['type' => 'boolean', 'value' => true],
                 'rag_top_k' => ['type' => 'scalar', 'value' => 5],
                 'learning_enabled' => ['type' => 'boolean', 'value' => false],
+                'harness_enabled' => ['type' => 'boolean', 'value' => false],
+                'harness_max_tries' => ['type' => 'scalar', 'value' => 10],
+                'research_max_iterations' => ['type' => 'scalar', 'value' => 8],
                 'tool_sql_query_enabled' => ['type' => 'boolean', 'value' => true],
                 'tool_schema_inspector_enabled' => ['type' => 'boolean', 'value' => true],
                 'tool_entity_url_enabled' => ['type' => 'boolean', 'value' => true],
@@ -52,6 +57,12 @@ class Configuration implements ConfigurationInterface
                 'tool_system_info_enabled' => ['type' => 'boolean', 'value' => false],
                 'tool_translation_lookup_enabled' => ['type' => 'boolean', 'value' => true],
                 'tool_user_info_enabled' => ['type' => 'boolean', 'value' => true],
+                'tool_research_enabled' => ['type' => 'boolean', 'value' => false],
+                'tool_skill_enabled' => ['type' => 'boolean', 'value' => true],
+                'disabled_skills' => ['type' => 'array', 'value' => []],
+                'tool_code_search_enabled' => ['type' => 'boolean', 'value' => true],
+                'tool_code_read_enabled' => ['type' => 'boolean', 'value' => true],
+                'tool_console_command_enabled' => ['type' => 'boolean', 'value' => true],
             ]
         );
 

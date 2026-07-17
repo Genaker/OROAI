@@ -9,6 +9,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 
+/** Holds all registered AI tools and dispatches execution to the correct tool by name. */
 final class ToolRegistry
 {
     /** @var array<string, AiToolInterface> */

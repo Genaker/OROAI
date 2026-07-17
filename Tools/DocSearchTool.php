@@ -10,6 +10,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Genaker\Bundle\OroAI\Rag\RagStoreInterface;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 
+/** AI tool that searches the RAG knowledge base for OroCommerce documentation answers. */
 final class DocSearchTool implements AiToolInterface
 {
     public function __construct(

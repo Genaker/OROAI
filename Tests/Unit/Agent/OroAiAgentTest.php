@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Genaker\Bundle\OroAI\Tests\Unit\Agent;
 
+use Genaker\Bundle\OroAI\Agent\GuidelineProviderInterface;
 use Genaker\Bundle\OroAI\Agent\OroAiAgent;
 use Genaker\Bundle\OroAI\Agent\ToolRegistry;
 use Genaker\Bundle\OroAI\Core\Contract\AiToolInterface;
@@ -29,6 +30,7 @@ final class OroAiAgentTest extends TestCase
     private RagStoreInterface&MockObject $ragStore;
     private OroAiConfig&MockObject $config;
     private LlmClientInterface&MockObject $llmClient;
+    private GuidelineProviderInterface&MockObject $guidelineProvider;
 
     protected function setUp(): void
     {
@@ -47,6 +49,9 @@ final class OroAiAgentTest extends TestCase
         $this->config->method('isToolEnabled')->willReturn(true);
 
         $this->toolRegistry = new ToolRegistry([], $this->config);
+
+        $this->guidelineProvider = $this->createMock(GuidelineProviderInterface::class);
+        $this->guidelineProvider->method('getGuidelines')->willReturn([]);
     }
 
     public function testSimpleAnswerReturnsAgentResultWithReply(): void
@@ -66,6 +71,36 @@ final class OroAiAgentTest extends TestCase
         self::assertSame('OroCommerce is an eCommerce platform.', $result->reply);
         self::assertSame([], $result->toolTrace);
         self::assertSame([], $result->links);
+    }
+
+    /**
+     * The token-bar breakdown must estimate every prompt ingredient. With no
+     * guidelines/skills/history configured in this harness the base system
+     * prompt and the user message are the only non-zero parts.
+     */
+    public function testRunReturnsPromptBreakdownEstimates(): void
+    {
+        $this->llmClient
+            ->method('chat')
+            ->willReturn(new LlmResponse(
+                content: 'ok',
+                toolCalls: [],
+                finishReason: 'stop',
+                usage: [],
+            ));
+
+        $result = $this->createAgent()->run('What is OroCommerce?');
+
+        $breakdown = $result->promptBreakdown;
+        self::assertSame(
+            ['system_prompt', 'guidelines', 'custom_instructions', 'skills_catalog', 'tools', 'history', 'user_message'],
+            array_keys($breakdown),
+        );
+        self::assertGreaterThan(0, $breakdown['system_prompt']);
+        // "What is OroCommerce?" = 20 chars -> ceil-ish /4 = 5 tokens.
+        self::assertSame(5, $breakdown['user_message']);
+        self::assertSame(0, $breakdown['history']);
+        self::assertSame(0, $breakdown['skills_catalog']);
     }
 
     public function testToolCallFollowedByFinalAnswer(): void
@@ -113,6 +148,120 @@ final class OroAiAgentTest extends TestCase
         self::assertCount(1, $result->toolTrace);
         self::assertSame('test_tool', $result->toolTrace[0]['tool']);
         self::assertSame('{"arg":"val"}', $result->toolTrace[0]['args']);
+        self::assertSame('A test tool', $result->toolTrace[0]['tool_description']);
+    }
+
+    public function testUsageIsAggregatedAcrossToolCallingTurns(): void
+    {
+        $callCount = 0;
+        $this->llmClient->method('chat')
+            ->willReturnCallback(function () use (&$callCount): LlmResponse {
+                $callCount++;
+                if ($callCount === 1) {
+                    return new LlmResponse(
+                        content: '',
+                        toolCalls: [new ToolCall(id: 'call-1', name: 'test_tool', argsJson: '{}')],
+                        finishReason: 'tool_calls',
+                        usage: ['prompt_tokens' => 100, 'completion_tokens' => 20, 'total_tokens' => 120],
+                    );
+                }
+
+                return new LlmResponse(
+                    content: 'Done.',
+                    toolCalls: [],
+                    finishReason: 'stop',
+                    usage: ['prompt_tokens' => 150, 'completion_tokens' => 10, 'total_tokens' => 160],
+                );
+            });
+
+        $tool = $this->createMock(AiToolInterface::class);
+        $tool->method('getName')->willReturn('test_tool');
+        $tool->method('getDefinition')->willReturn(new ToolDefinition('test_tool', 'A test tool', []));
+        $tool->method('execute')->willReturn(ToolResult::success('ok'));
+
+        $this->toolRegistry = new ToolRegistry([$tool], $this->config);
+
+        $agent = $this->createAgent();
+        $result = $agent->run('test');
+
+        // Two LLM calls in this run -- usage must be the sum of both, not just the last.
+        self::assertSame(250, $result->usage['prompt_tokens']);
+        self::assertSame(30, $result->usage['completion_tokens']);
+        self::assertSame(280, $result->usage['total_tokens']);
+    }
+
+    public function testProgressCallbackReceivesToolCallAndResultEvents(): void
+    {
+        $callCount = 0;
+        $this->llmClient->method('chat')
+            ->willReturnCallback(function () use (&$callCount): LlmResponse {
+                $callCount++;
+                if ($callCount === 1) {
+                    return new LlmResponse(
+                        content: '',
+                        toolCalls: [new ToolCall(id: 'call-1', name: 'test_tool', argsJson: '{"arg":"val"}')],
+                        finishReason: 'tool_calls',
+                        usage: [],
+                    );
+                }
+
+                return new LlmResponse(content: 'Done.', toolCalls: [], finishReason: 'stop', usage: []);
+            });
+
+        $tool = $this->createMock(AiToolInterface::class);
+        $tool->method('getName')->willReturn('test_tool');
+        $tool->method('getDefinition')->willReturn(new ToolDefinition('test_tool', 'A test tool', []));
+        $tool->method('execute')->willReturn(ToolResult::success('42'));
+
+        $this->toolRegistry = new ToolRegistry([$tool], $this->config);
+
+        $events = [];
+        $agent = $this->createAgent();
+        $agent->run('test', [], function (array $event) use (&$events): void {
+            $events[] = $event;
+        });
+
+        self::assertCount(2, $events);
+        self::assertSame('tool_call', $events[0]['type']);
+        self::assertSame('test_tool', $events[0]['tool']);
+        self::assertSame(['arg' => 'val'], $events[0]['args']);
+        self::assertSame('tool_result', $events[1]['type']);
+        self::assertSame('test_tool', $events[1]['tool']);
+        self::assertTrue($events[1]['success']);
+    }
+
+    public function testProgressCallbackReportsFailedToolExecution(): void
+    {
+        $this->config = $this->createMock(OroAiConfig::class);
+        $this->config->method('isRagEnabled')->willReturn(false);
+        $this->config->method('getMaxIterations')->willReturn(1);
+        $this->config->method('getTemperature')->willReturn(0.3);
+        $this->config->method('getRagTopK')->willReturn(5);
+        $this->config->method('isToolEnabled')->willReturn(true);
+
+        $this->llmClient->method('chat')
+            ->willReturn(new LlmResponse(
+                content: '',
+                toolCalls: [new ToolCall(id: 'call-1', name: 'failing_tool', argsJson: '{}')],
+                finishReason: 'tool_calls',
+                usage: [],
+            ));
+
+        $tool = $this->createMock(AiToolInterface::class);
+        $tool->method('getName')->willReturn('failing_tool');
+        $tool->method('getDefinition')->willReturn(new ToolDefinition('failing_tool', 'Fails', []));
+        $tool->method('execute')->willThrowException(new \RuntimeException('boom'));
+
+        $this->toolRegistry = new ToolRegistry([$tool], $this->config);
+
+        $events = [];
+        $agent = $this->createAgent();
+        $agent->run('test', [], function (array $event) use (&$events): void {
+            $events[] = $event;
+        });
+
+        self::assertSame('tool_result', $events[1]['type']);
+        self::assertFalse($events[1]['success']);
     }
 
     /**
@@ -509,6 +658,52 @@ final class OroAiAgentTest extends TestCase
         self::assertSame('Follow-up question', $capturedRequest->messages[3]->content);
     }
 
+    public function testCustomInstructionsArePrependedAsFirstSystemMessage(): void
+    {
+        $this->config->method('getCustomInstructions')
+            ->willReturn('Always refer to customers as "accounts".');
+
+        $capturedRequest = null;
+        $this->llmClient->method('chat')
+            ->willReturnCallback(function (LlmRequest $req) use (&$capturedRequest): LlmResponse {
+                $capturedRequest = $req;
+
+                return new LlmResponse(content: 'ok', toolCalls: [], finishReason: 'stop', usage: []);
+            });
+
+        $agent = $this->createAgent();
+        $agent->run('What is OroCommerce?');
+
+        self::assertNotNull($capturedRequest);
+        self::assertSame(Role::System, $capturedRequest->messages[0]->role);
+        self::assertSame('Always refer to customers as "accounts".', $capturedRequest->messages[0]->content);
+
+        // The built-in prompt must still follow right after, unmodified.
+        self::assertSame(Role::System, $capturedRequest->messages[1]->role);
+        self::assertStringContainsString('You are an AI assistant', $capturedRequest->messages[1]->content);
+    }
+
+    public function testNoCustomInstructionsMeansOnlyBuiltInSystemPromptIsSent(): void
+    {
+        $this->config->method('getCustomInstructions')->willReturn('');
+
+        $capturedRequest = null;
+        $this->llmClient->method('chat')
+            ->willReturnCallback(function (LlmRequest $req) use (&$capturedRequest): LlmResponse {
+                $capturedRequest = $req;
+
+                return new LlmResponse(content: 'ok', toolCalls: [], finishReason: 'stop', usage: []);
+            });
+
+        $agent = $this->createAgent();
+        $agent->run('What is OroCommerce?');
+
+        self::assertNotNull($capturedRequest);
+        // No custom-instructions message prepended -- the built-in prompt is first.
+        self::assertSame(Role::System, $capturedRequest->messages[0]->role);
+        self::assertStringContainsString('You are an AI assistant', $capturedRequest->messages[0]->content);
+    }
+
     public function testMaxIterationsWithNoTraceProducesNoResultsMessage(): void
     {
         $this->config = $this->createMock(OroAiConfig::class);
@@ -565,6 +760,7 @@ final class OroAiAgentTest extends TestCase
             $this->toolRegistry,
             $this->ragStore,
             $this->config,
+            $this->guidelineProvider,
         );
     }
 }

@@ -10,6 +10,9 @@ services:
       $modelsFile: '%kernel.project_dir%/src/Genaker/Bundle/OroAI/Resources/config/ai_models.yml'
     tags: ['form.type']
 
+  Genaker\Bundle\OroAI\Form\Type\SkillChoiceType:
+    tags: ['form.type']
+
   # Config
   Genaker\Bundle\OroAI\Service\OroAiConfig:
     public: true
@@ -62,6 +65,31 @@ services:
   Genaker\Bundle\OroAI\Tools\ConfigInspectorTool:
     arguments:
       $configManager: '@oro_config.manager'
+      $urlGenerator: '@router'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\SkillTool:
+    tags: ['genaker_oroai.tool']
+
+  # What the code tools may show the LLM: whole project by default,
+  # var/ (+ OROAI_CODE_EXCLUDE) excluded, vendor limited to Oro business
+  # logic (OROAI_CODE_VENDOR_ALLOWED, default "oro"), secrets redacted.
+  Genaker\Bundle\OroAI\Tools\CodeAccessPolicy:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
+      $excludedDirsCsv: '%env(default::string:OROAI_CODE_EXCLUDE)%'
+      $vendorAllowedCsv: '%env(default::string:OROAI_CODE_VENDOR_ALLOWED)%'
+
+  Genaker\Bundle\OroAI\Tools\CodeSearchTool:
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\CodeReadTool:
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\ConsoleCommandTool:
+    arguments:
+      $projectDir: '%kernel.project_dir%'
+      $extraAllowedPrefixes: '%env(default::string:OROAI_CONSOLE_ALLOWED)%'
     tags: ['genaker_oroai.tool']
 
   Genaker\Bundle\OroAI\Tools\EntityMetadataTool:
@@ -89,6 +117,9 @@ services:
   Genaker\Bundle\OroAI\Tools\UserInfoTool:
     arguments:
       $connection: '@doctrine.dbal.default_connection'
+    tags: ['genaker_oroai.tool']
+
+  Genaker\Bundle\OroAI\Tools\ResearchTool:
     tags: ['genaker_oroai.tool']
 
   # Tool Registry
@@ -149,12 +180,59 @@ services:
       $connection: '@doctrine.dbal.default_connection'
     tags: ['genaker_oroai.rag_provider']
 
+  Genaker\Bundle\OroAI\Rag\Provider\CacheMemoryRagProvider:
+    arguments:
+      $memoryDir: '%kernel.project_dir%/var/data/oroai-memory'
+    tags: ['genaker_oroai.rag_provider']
+
   # Agent
+  Genaker\Bundle\OroAI\Agent\GuidelineProvider: ~
+
+  Genaker\Bundle\OroAI\Agent\SkillProvider: ~
+
+  Genaker\Bundle\OroAI\Service\TokenCostEstimator: ~
+
+  Genaker\Bundle\OroAI\Service\ChatTranscriptLogger:
+    public: true
+    arguments:
+      $cacheDir: '%kernel.cache_dir%'
+
+  Genaker\Bundle\OroAI\Agent\GuidelineProviderInterface:
+    alias: Genaker\Bundle\OroAI\Agent\GuidelineProvider
+
   Genaker\Bundle\OroAI\Agent\OroAiAgent:
     public: true
 
+  Genaker\Bundle\OroAI\Agent\ResolutionHarness:
+    public: true
+    arguments:
+      $memoryDir: '%kernel.project_dir%/var/data/oroai-memory'
+
+  Genaker\Bundle\OroAI\Agent\HarnessInterface:
+    alias: Genaker\Bundle\OroAI\Agent\ResolutionHarness
+
   Genaker\Bundle\OroAI\Agent\LearningRecorder:
     public: true
+
+  Genaker\Bundle\OroAI\Agent\ChatProgressStore:
+    public: true
+
+  Genaker\Bundle\OroAI\Service\ChatSessionStore:
+    public: true
+
+  Genaker\Bundle\OroAI\Agent\ContextWindowManager: ~
+
+  Genaker\Bundle\OroAI\Service\LlmErrorPresenter: ~
+
+  Genaker\Bundle\OroAI\Service\ChatOrchestrator: ~
+
+  Genaker\Bundle\OroAI\Agent\ResearchSubAgent:
+    public: true
+    arguments:
+      $tools: !tagged_iterator genaker_oroai.tool
+
+  Genaker\Bundle\OroAI\Agent\ResearchAgentInterface:
+    alias: Genaker\Bundle\OroAI\Agent\ResearchSubAgent
 
   # Commands
   Genaker\Bundle\OroAI\Command\RagReindexCommand:

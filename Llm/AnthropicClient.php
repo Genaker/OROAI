@@ -14,6 +14,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+/** LLM client that calls the Anthropic Messages API with tool-use support. */
 final class AnthropicClient implements LlmClientInterface
 {
     private const string DEFAULT_URL = 'https://api.anthropic.com/v1/messages';
@@ -23,7 +24,8 @@ final class AnthropicClient implements LlmClientInterface
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly OroAiConfig $config,
-    ) {}
+    ) {
+    }
 
     public function getName(): string
     {
@@ -92,7 +94,7 @@ final class AnthropicClient implements LlmClientInterface
             content: $content,
             toolCalls: $toolCalls,
             finishReason: $data['stop_reason'] ?? null,
-            usage: $data['usage'] ?? [],
+            usage: LlmResponse::normalizeUsage($data['usage'] ?? [], 'input_tokens', 'output_tokens'),
         );
     }
 

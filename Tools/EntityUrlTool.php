@@ -9,6 +9,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
+/** AI tool that resolves OroCommerce entity names to their admin panel URLs. */
 final class EntityUrlTool implements AiToolInterface
 {
     private const ENTITY_ROUTES = [
@@ -49,7 +50,8 @@ final class EntityUrlTool implements AiToolInterface
     {
         return new ToolDefinition(
             'entity_url',
-            'Resolve an OroCommerce entity name to its admin panel URL. Supports index, view, and create actions.',
+            'Resolve an OroCommerce entity name to its admin panel URL. Supports index, view, and create actions. '
+            . 'Use when asked where to see or manage a kind of record, e.g. "where can I see customer users".',
             [
                 'type' => 'object',
                 'properties' => [

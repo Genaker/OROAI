@@ -176,20 +176,14 @@ class ChatMessageEndpointTest extends IntegrationTestCase
     }
 
     /**
-     * A full two-turn conversation through the real HTTP endpoint: the first
-     * message's history is empty, but the second carries the accumulated
-     * history the JS widget builds up (oroai-chat.js's `history.push(...)`
-     * after every exchange) -- exactly the shape that triggers
-     * ChatController::parseHistory()'s `Role::tryFrom()` call.
-     *
-     * Regression guard: Role::tryFrom() used to fatal ("Attempted to load
-     * class Role") on any request with non-empty history, because the Role
-     * enum was defined inside ChatMessage.php with no file of its own, so it
-     * only autoloaded as a side effect of ChatMessage loading first --
-     * something that never happened before parseHistory() ran when history
-     * had entries. A conversation's first message (empty history) always
-     * worked; only the follow-up broke, which single-message tests can't
-     * catch.
+     * A full two-turn conversation through the real HTTP endpoint. History is
+     * server-side now (ChatOrchestrator loads it from ChatSessionStore by
+     * session_id), so both turns send the SAME session id and the follow-up
+     * relies on the server remembering turn one. A legacy 'history' field is
+     * still sent on the follow-up to prove old cached widget JS payloads are
+     * harmlessly ignored rather than crashing (this request shape used to
+     * fatal on Role enum autoloading back when the controller parsed
+     * client-supplied history).
      */
     public function testAuthenticatedConversationWithFollowUpHistoryWorks(): void
     {
@@ -199,9 +193,11 @@ class ChatMessageEndpointTest extends IntegrationTestCase
             $this->markTestSkipped('No API key configured — skipping live chat endpoint test.');
         }
 
+        $sessionId = 'inttest' . bin2hex(random_bytes(4));
+
         $first = $this->authenticatedPost('/admin/oroai/chat/message', [
             'message' => 'Where are customer users?',
-            'history' => [],
+            'session_id' => $sessionId,
         ]);
 
         self::assertContains($first->getStatusCode(), [200, 500], 'First message must return JSON, not crash.');
@@ -213,6 +209,7 @@ class ChatMessageEndpointTest extends IntegrationTestCase
 
         $second = $this->authenticatedPost('/admin/oroai/chat/message', [
             'message' => 'And what about orders?',
+            'session_id' => $sessionId,
             'history' => [
                 ['role' => 'user', 'content' => 'Where are customer users?'],
                 ['role' => 'assistant', 'content' => $firstData['reply']],

@@ -9,6 +9,7 @@ use Genaker\Bundle\OroAI\Rag\Contract\RagProviderInterface;
 use Genaker\Bundle\OroAI\Rag\RagDocument;
 use Genaker\Bundle\OroAI\Rag\TextChunker;
 
+/** Provides RAG documents from the OroCommerce global system configuration table. */
 final class SystemConfigRagProvider implements RagProviderInterface
 {
     private const array SENSITIVE_PATTERNS = ['password', 'secret', 'api_key', 'token', 'sk-', 'private'];
@@ -29,7 +30,8 @@ final class SystemConfigRagProvider implements RagProviderInterface
 
     public function provide(): array
     {
-        // oro_config_value stores values in typed columns: text_value (scalar), array_value (array), object_value (object)
+        // oro_config_value stores values in typed columns:
+        // text_value (scalar), array_value (array), object_value (object)
         $rows = $this->connection->createQueryBuilder()
             ->select('cv.name', 'cv.section', 'cv.type', 'cv.text_value', 'cv.array_value')
             ->from('oro_config_value', 'cv')

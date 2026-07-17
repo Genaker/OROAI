@@ -10,6 +10,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 
+/** AI tool that executes read-only SQL SELECT queries against the OroCommerce database. */
 final class SqlQueryTool implements AiToolInterface
 {
     private const FORBIDDEN_KEYWORDS = [
@@ -33,7 +34,8 @@ final class SqlQueryTool implements AiToolInterface
     {
         return new ToolDefinition(
             'sql_query',
-            'Execute a read-only SQL SELECT query against the OroCommerce database. Returns rows as JSON. Only SELECT statements are allowed.',
+            'Execute a read-only SQL SELECT query against the OroCommerce database. Returns rows as JSON. Only SELECT statements are allowed. '
+            . 'Prefer schema_inspector first to confirm table/column names. If the query fails, read the error and retry with a corrected query.',
             [
                 'type' => 'object',
                 'properties' => [

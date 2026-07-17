@@ -1,0 +1,22 @@
+oro_ai:
+    guidelines:
+        - >-
+          For a single direct lookup, use the specific tool for it — only use a broader
+          research/investigation tool for open-ended questions that genuinely need
+          cross-checking several tools or tables, e.g. "explain how shipping rates are
+          calculated end to end", not "what is order #42".
+        - >-
+          If a tool returns no results, an error, or a generic/unhelpful answer, don't stop
+          there — try a different tool, a broader or rephrased query, or both before giving
+          up. Only fall back to a general answer once you've actually tried more than one
+          angle.
+        - 'Always provide clickable admin URLs when referencing entities.'
+        - 'Keep answers concise and actionable.'
+        - >-
+          Never construct, complete, or guess a full absolute URL (scheme://host[:port]/...)
+          yourself. Present admin links exactly as a tool returned them — a relative path
+          starting with /admin/... — and nothing else. The browser already resolves a
+          relative path against whatever host and port this install is actually running on;
+          inventing a scheme and host (e.g. assuming "https://localhost" or a default port)
+          is never correct and will be wrong whenever the real install uses http, a
+          non-standard port, or a different hostname.

@@ -64,6 +64,40 @@ system_configuration:
         tooltip: 'Select the model to use. Leave empty to use the provider default. Models are defined in Resources/config/ai_models.yml.'
       priority: 85
 
+    genaker_oro_ai.custom_instructions:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextareaType
+      search_type: text
+      options:
+        label: 'Custom Instructions'
+        tooltip: >
+          Free-form instructions prepended ahead of the built-in system prompt on every AI call
+          (e.g. house style, company terminology, extra guardrails). Can also be set with the
+          OROAI_CUSTOM_INSTRUCTIONS env var. Leave empty to use only the built-in prompt.
+        required: false
+        attr:
+          rows: 6
+          placeholder: "e.g. Always refer to customers as \"accounts\". Never suggest deleting records — recommend disabling them instead."
+      priority: 83
+
+    genaker_oro_ai.additional_guidelines:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextareaType
+      search_type: text
+      options:
+        label: 'Additional Guidelines'
+        tooltip: >
+          Guidelines merged AFTER every bundle's oro_ai_guidelines.yml, with override
+          semantics: a YAML mapping ("my_key: My rule text") adds or replaces the bundle
+          guideline with that key, and "my_key: ~" removes it entirely. Plain text lines
+          (no keys) are simply appended. Can also be set with the
+          OROAI_ADDITIONAL_GUIDELINES env var.
+        required: false
+        attr:
+          rows: 6
+          placeholder: "links: Always provide clickable admin URLs.\nsome_bundle_key: ~   # removes that bundle guideline"
+      priority: 82
+
     genaker_oro_ai.temperature:
       data_type: string
       type: Symfony\Component\Form\Extension\Core\Type\TextType
@@ -186,6 +220,45 @@ system_configuration:
         tooltip: 'When enabled, successful SQL corrections are saved to improve future queries.'
       priority: 35
 
+    genaker_oro_ai.harness_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      search_type: text
+      options:
+        label: 'Enable Resolution Harness'
+        tooltip: >
+          When enabled, the agent runs in a controlled retry loop. If the first reply is incomplete
+          the harness gathers more context via tools and retries. Resolved answers are saved to
+          var/cache/memory/ for future RAG retrieval. Disable to use the single-pass agent.
+      priority: 32
+
+    genaker_oro_ai.harness_max_tries:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'Harness Max Tries'
+        tooltip: 'Maximum number of resolution attempts before returning the best available answer (min 1).'
+        required: false
+        attr:
+          placeholder: '10'
+      priority: 30
+
+    genaker_oro_ai.research_max_iterations:
+      data_type: string
+      type: Symfony\Component\Form\Extension\Core\Type\TextType
+      search_type: text
+      options:
+        label: 'Research Sub-Agent Max Steps'
+        tooltip: >
+          Max tool-calling rounds for the research sub-agent's own investigation loop (see the
+          "Research" tool below), separate from and typically higher than Max Tool Iterations,
+          since a delegated deep-dive legitimately needs more steps than a single turn.
+        required: false
+        attr:
+          placeholder: '8'
+      priority: 28
+
     genaker_oro_ai.tool_sql_query_enabled:
       data_type: boolean
       type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
@@ -217,6 +290,53 @@ system_configuration:
         label: 'Find Entity'
         tooltip: 'Search for entities by name or identifier.'
       priority: 85
+
+    genaker_oro_ai.tool_skill_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Skills'
+        tooltip: >
+          Let the agent load step-by-step skills declared by bundles in
+          Resources/ai_skills/*.md or Resources/config/oro/oro_ai_skills.yml.
+      priority: 81
+
+    genaker_oro_ai.disabled_skills:
+      data_type: array
+      type: Genaker\Bundle\OroAI\Form\Type\SkillChoiceType
+      options:
+        label: 'Disabled Skills'
+        tooltip: >
+          Tick a skill to HIDE it from the agent. Unticked skills stay active, and
+          skills added later by any bundle are enabled by default. The list shows
+          every skill registered via Resources/ai_skills/*.md or oro_ai_skills.yml.
+      priority: 80
+
+    genaker_oro_ai.tool_code_search_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Code Search'
+        tooltip: 'Grep the project source (src/, config/, templates/) — read-only, secrets redacted.'
+      priority: 79
+
+    genaker_oro_ai.tool_code_read_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Code Read'
+        tooltip: 'Read slices of project source files located via Code Search — read-only, secrets redacted.'
+      priority: 78
+
+    genaker_oro_ai.tool_console_command_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Console Commands'
+        tooltip: >
+          Run allowlisted READ-ONLY bin/console commands (debug:*, lint:*, doctrine
+          introspection). Extra prefixes via OROAI_CONSOLE_ALLOWED.
+      priority: 77
 
     genaker_oro_ai.tool_doc_search_enabled:
       data_type: boolean
@@ -282,6 +402,18 @@ system_configuration:
         tooltip: 'Query user accounts and roles.'
       priority: 45
 
+    genaker_oro_ai.tool_research_enabled:
+      data_type: boolean
+      type: Oro\Bundle\ConfigBundle\Form\Type\ConfigCheckbox
+      options:
+        label: 'Research Sub-Agent'
+        tooltip: >
+          Lets the assistant delegate open-ended, multi-step investigations to a separate
+          research sub-agent with its own tool-calling loop, returning one synthesized answer
+          instead of a raw trace. Disabled by default -- unlike the other tools, one call spawns
+          a whole extra multi-step LLM loop (see "Research Sub-Agent Max Steps" above).
+      priority: 40
+
   tree:
     system_configuration:
       platform:
@@ -296,6 +428,8 @@ system_configuration:
                       - genaker_oro_ai.api_key
                       - genaker_oro_ai.api_url
                       - genaker_oro_ai.model
+                      - genaker_oro_ai.custom_instructions
+                      - genaker_oro_ai.additional_guidelines
                       - genaker_oro_ai.temperature
                       - genaker_oro_ai.max_iterations
                       - genaker_oro_ai.max_retries
@@ -307,6 +441,9 @@ system_configuration:
                       - genaker_oro_ai.rag_enabled
                       - genaker_oro_ai.rag_top_k
                       - genaker_oro_ai.learning_enabled
+                      - genaker_oro_ai.harness_enabled
+                      - genaker_oro_ai.harness_max_tries
+                      - genaker_oro_ai.research_max_iterations
                   genaker_oroai_tools:
                     children:
                       - genaker_oro_ai.tool_sql_query_enabled
@@ -321,3 +458,9 @@ system_configuration:
                       - genaker_oro_ai.tool_system_info_enabled
                       - genaker_oro_ai.tool_translation_lookup_enabled
                       - genaker_oro_ai.tool_user_info_enabled
+                      - genaker_oro_ai.tool_research_enabled
+                      - genaker_oro_ai.tool_skill_enabled
+                      - genaker_oro_ai.disabled_skills
+                      - genaker_oro_ai.tool_code_search_enabled
+                      - genaker_oro_ai.tool_code_read_enabled
+                      - genaker_oro_ai.tool_console_command_enabled

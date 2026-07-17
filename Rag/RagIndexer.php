@@ -7,6 +7,7 @@ namespace Genaker\Bundle\OroAI\Rag;
 use Doctrine\DBAL\Connection;
 use Genaker\Bundle\OroAI\Rag\Contract\RagProviderInterface;
 
+/** Orchestrates document extraction from RAG providers and indexing into the RAG store. */
 final class RagIndexer
 {
     public function __construct(

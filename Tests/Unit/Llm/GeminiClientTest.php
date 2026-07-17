@@ -113,7 +113,9 @@ final class GeminiClientTest extends TestCase
         $client = new GeminiClient($httpClient, $config);
         $client->chat(new LlmRequest(messages: [ChatMessage::user('test')]));
 
-        self::assertStringContainsString('gemini-2.0-flash', $capturedUrl);
+        // Default bumped from gemini-2.0-flash: Google zeroed out its free-tier
+        // quota (429 "limit: 0"), making it unusable as a default.
+        self::assertStringContainsString('gemini-2.5-flash', $capturedUrl);
     }
 
     public function testChatParsesTextPartsResponse(): void
@@ -139,7 +141,9 @@ final class GeminiClientTest extends TestCase
         self::assertSame('Part one. Part two.', $response->content);
         self::assertSame([], $response->toolCalls);
         self::assertSame('STOP', $response->finishReason);
-        self::assertSame(15, $response->usage['promptTokenCount']);
+        self::assertSame(15, $response->usage['prompt_tokens']);
+        self::assertSame(25, $response->usage['completion_tokens']);
+        self::assertSame(40, $response->usage['total_tokens']);
     }
 
     public function testChatParsesFunctionCallParts(): void
@@ -188,6 +192,97 @@ final class GeminiClientTest extends TestCase
             '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
             $response->toolCalls[0]->id,
         );
+    }
+
+    public function testChatCapturesThoughtSignatureFromFunctionCallPart(): void
+    {
+        $mockResponse = new MockResponse(json_encode([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'functionCall' => ['name' => 'route_search', 'args' => ['keyword' => 'config']],
+                                'thoughtSignature' => 'opaque-signature-abc',
+                            ],
+                        ],
+                    ],
+                    'finishReason' => 'STOP',
+                ],
+            ],
+            'usageMetadata' => [],
+        ]));
+
+        $client = new GeminiClient(new MockHttpClient($mockResponse), $this->createConfigMock());
+        $response = $client->chat(new LlmRequest(messages: [ChatMessage::user('test')]));
+
+        self::assertSame('opaque-signature-abc', $response->toolCalls[0]->thoughtSignature);
+    }
+
+    public function testChatMapsAssistantToolCallEchoesThoughtSignatureWhenPresent(): void
+    {
+        $capturedBody = null;
+
+        $mockResponse = new MockResponse(json_encode([
+            'candidates' => [['content' => ['parts' => [['text' => 'ok']]], 'finishReason' => 'STOP']],
+            'usageMetadata' => [],
+        ]));
+
+        $httpClient = new MockHttpClient(function (string $method, string $url, array $options) use ($mockResponse, &$capturedBody): MockResponse {
+            $capturedBody = json_decode($options['body'], true);
+
+            return $mockResponse;
+        });
+
+        // Regression guard for: "Function call is missing a thought_signature
+        // in functionCall parts" (HTTP 400) — Gemini's "thinking" models
+        // require the signature they originally issued to be echoed back
+        // verbatim when the assistant's prior tool-calling turn is replayed
+        // as history on the next request.
+        $assistantMsg = new ChatMessage(
+            role: \Genaker\Bundle\OroAI\Core\Model\Role::Assistant,
+            content: '',
+            toolCalls: [new ToolCall(
+                id: 'tc-1',
+                name: 'route_search',
+                argsJson: '{"keyword":"config"}',
+                thoughtSignature: 'opaque-signature-abc',
+            )],
+        );
+
+        $client = new GeminiClient($httpClient, $this->createConfigMock());
+        $client->chat(new LlmRequest(messages: [$assistantMsg]));
+
+        $part = $capturedBody['contents'][0]['parts'][0];
+        self::assertSame('opaque-signature-abc', $part['thoughtSignature']);
+    }
+
+    public function testChatMapsAssistantToolCallOmitsThoughtSignatureWhenAbsent(): void
+    {
+        $capturedBody = null;
+
+        $mockResponse = new MockResponse(json_encode([
+            'candidates' => [['content' => ['parts' => [['text' => 'ok']]], 'finishReason' => 'STOP']],
+            'usageMetadata' => [],
+        ]));
+
+        $httpClient = new MockHttpClient(function (string $method, string $url, array $options) use ($mockResponse, &$capturedBody): MockResponse {
+            $capturedBody = json_decode($options['body'], true);
+
+            return $mockResponse;
+        });
+
+        $assistantMsg = new ChatMessage(
+            role: \Genaker\Bundle\OroAI\Core\Model\Role::Assistant,
+            content: '',
+            toolCalls: [new ToolCall(id: 'tc-1', name: 'sql_query', argsJson: '{"sql":"SELECT 1"}')],
+        );
+
+        $client = new GeminiClient($httpClient, $this->createConfigMock());
+        $client->chat(new LlmRequest(messages: [$assistantMsg]));
+
+        $part = $capturedBody['contents'][0]['parts'][0];
+        self::assertArrayNotHasKey('thoughtSignature', $part);
     }
 
     public function testChatOmitsSystemInstructionWhenNoSystemMessages(): void
@@ -314,15 +409,129 @@ final class GeminiClientTest extends TestCase
         self::assertSame('sql_query', $msg['parts'][0]['functionResponse']['name']);
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Model fallback on persistent 429 (quota limit 0)
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Real regression case: Google set gemini-2.0-flash's free-tier quota to 0
+     * ("limit: 0" — retrying the same model can never succeed), so a persistent
+     * 429 must switch to the first fallback model instead of failing.
+     */
+    public function testPersistent429SwitchesToFallbackModel(): void
+    {
+        $requestUrls = [];
+        $responses = [
+            // Verbatim (abridged) body Gemini returns for a zero-quota model.
+            new MockResponse(
+                '{"error":{"code":429,"message":"You exceeded your current quota, please check your plan'
+                . ' and billing details. Quota exceeded for metric:'
+                . ' generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0,'
+                . ' model: gemini-2.0-flash","status":"RESOURCE_EXHAUSTED"}}',
+                ['http_code' => 429],
+            ),
+            new MockResponse(json_encode([
+                'candidates' => [['content' => ['parts' => [['text' => 'ok from fallback']]], 'finishReason' => 'STOP']],
+            ])),
+        ];
+
+        $httpClient = new MockHttpClient(function (string $method, string $url) use (&$responses, &$requestUrls): MockResponse {
+            $requestUrls[] = $url;
+
+            return array_shift($responses);
+        });
+
+        $client = new GeminiClient($httpClient, $this->createConfigMock(model: 'gemini-2.0-flash'));
+        $response = $client->chat(new LlmRequest(messages: [ChatMessage::user('hi')]));
+
+        self::assertCount(2, $requestUrls);
+        self::assertStringContainsString('gemini-2.0-flash', $requestUrls[0]);
+        self::assertStringContainsString('gemini-2.5-flash', $requestUrls[1]);
+        self::assertSame('ok from fallback', $response->content);
+    }
+
+    public function testSuccessfulPrimaryModelMakesNoFallbackRequests(): void
+    {
+        $requestUrls = [];
+        $httpClient = new MockHttpClient(function (string $method, string $url) use (&$requestUrls): MockResponse {
+            $requestUrls[] = $url;
+
+            return new MockResponse(json_encode([
+                'candidates' => [['content' => ['parts' => [['text' => 'ok']]], 'finishReason' => 'STOP']],
+            ]));
+        });
+
+        $client = new GeminiClient($httpClient, $this->createConfigMock(model: 'gemini-2.0-flash'));
+        $client->chat(new LlmRequest(messages: [ChatMessage::user('hi')]));
+
+        self::assertCount(1, $requestUrls);
+        self::assertStringContainsString('gemini-2.0-flash', $requestUrls[0]);
+    }
+
+    public function testConfiguredFallbackModelsOverrideDefaults(): void
+    {
+        $requestUrls = [];
+        $responses = [
+            new MockResponse('{"error":{"code":429}}', ['http_code' => 429]),
+            new MockResponse(json_encode([
+                'candidates' => [['content' => ['parts' => [['text' => 'ok']]], 'finishReason' => 'STOP']],
+            ])),
+        ];
+        $httpClient = new MockHttpClient(function (string $method, string $url) use (&$responses, &$requestUrls): MockResponse {
+            $requestUrls[] = $url;
+
+            return array_shift($responses);
+        });
+
+        $config = $this->createConfigMock(model: 'gemini-2.0-flash', fallbackModels: ['custom-model-x']);
+        $client = new GeminiClient($httpClient, $config);
+        $client->chat(new LlmRequest(messages: [ChatMessage::user('hi')]));
+
+        self::assertCount(2, $requestUrls);
+        self::assertStringContainsString('custom-model-x', $requestUrls[1]);
+    }
+
+    /**
+     * A configured model that duplicates a default fallback must not be tried
+     * twice; when every candidate is quota-limited the client gives up and the
+     * 429 surfaces as an exception (handled by ChatController::humanizeError()).
+     */
+    public function testAllModels429ThrowsAfterTryingEachCandidateOnce(): void
+    {
+        $requestUrls = [];
+        $httpClient = new MockHttpClient(function (string $method, string $url) use (&$requestUrls): MockResponse {
+            $requestUrls[] = $url;
+
+            return new MockResponse('{"error":{"code":429}}', ['http_code' => 429]);
+        });
+
+        // Primary 'gemini-2.5-flash' duplicates the first default fallback →
+        // candidates deduplicate to [gemini-2.5-flash, gemini-flash-latest].
+        $client = new GeminiClient($httpClient, $this->createConfigMock(model: 'gemini-2.5-flash'));
+
+        try {
+            $client->chat(new LlmRequest(messages: [ChatMessage::user('hi')]));
+            self::fail('Expected an exception when every model is 429-limited');
+        } catch (\Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface $e) {
+            self::assertStringContainsString('429', $e->getMessage());
+        }
+
+        self::assertCount(2, $requestUrls);
+        self::assertStringContainsString('gemini-2.5-flash', $requestUrls[0]);
+        self::assertStringContainsString('gemini-flash-latest', $requestUrls[1]);
+    }
+
     private function createConfigMock(
         string $apiKey = 'test-key',
         string $apiUrl = '',
         string $model = '',
+        array $fallbackModels = [],
     ): OroAiConfig {
         $config = $this->createMock(OroAiConfig::class);
         $config->method('getApiKey')->willReturn($apiKey);
         $config->method('getApiUrl')->willReturn($apiUrl);
         $config->method('getModel')->willReturn($model);
+        $config->method('getFallbackModels')->willReturn($fallbackModels);
 
         return $config;
     }

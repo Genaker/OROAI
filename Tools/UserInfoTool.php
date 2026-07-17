@@ -9,6 +9,7 @@ use Genaker\Bundle\OroAI\Core\Contract\AiToolInterface;
 use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 
+/** AI tool to look up admin users, customer users, roles, and user counts via DBAL. */
 final class UserInfoTool implements AiToolInterface
 {
     public function __construct(
@@ -25,7 +26,8 @@ final class UserInfoTool implements AiToolInterface
     {
         return new ToolDefinition(
             'user_info',
-            'Look up admin users, customer users, or check user roles and permissions. Quick way to answer "do we have user X" or "what role does user Y have" without writing raw SQL.',
+            'Look up admin users, customer users, or check user roles and permissions. '
+            . 'Quick way to answer "do we have user X" or "what role does user Y have" without writing raw SQL.',
             [
                 'type' => 'object',
                 'properties' => [
@@ -108,7 +110,16 @@ final class UserInfoTool implements AiToolInterface
         }
 
         $qb = $this->connection->createQueryBuilder()
-            ->select('cu.id', 'cu.email', 'cu.first_name', 'cu.last_name', 'cu.enabled', 'cu.confirmed', 'cu.last_login', 'c.name AS customer_name')
+            ->select(
+                'cu.id',
+                'cu.email',
+                'cu.first_name',
+                'cu.last_name',
+                'cu.enabled',
+                'cu.confirmed',
+                'cu.last_login',
+                'c.name AS customer_name'
+            )
             ->from('oro_customer_user', 'cu')
             ->leftJoin('cu', 'oro_customer', 'c', 'cu.customer_id = c.id')
             ->andWhere('LOWER(cu.email) = :email')

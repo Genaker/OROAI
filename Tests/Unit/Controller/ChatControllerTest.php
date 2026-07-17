@@ -4,33 +4,66 @@ declare(strict_types=1);
 
 namespace Genaker\Bundle\OroAI\Tests\Unit\Controller;
 
-use Genaker\Bundle\OroAI\Agent\OroAiAgent;
+use Genaker\Bundle\OroAI\Agent\ChatProgressStore;
 use Genaker\Bundle\OroAI\Controller\ChatController;
-use Genaker\Bundle\OroAI\Core\Model\AgentResult;
-use Genaker\Bundle\OroAI\Core\Model\ChatMessage;
+use Genaker\Bundle\OroAI\Core\Model\ChatOutcome;
+use Genaker\Bundle\OroAI\Service\ChatOrchestrator;
+use Genaker\Bundle\OroAI\Service\ChatSessionStore;
+use Genaker\Bundle\OroAI\Service\LlmErrorPresenter;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
+use Oro\Bundle\DashboardBundle\Model\WidgetConfigs;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Twig\Environment;
 
+/**
+ * The controller is a thin HTTP layer: parse → orchestrate → serialize.
+ * Error humanization is covered by LlmErrorPresenterTest, turn execution by
+ * ChatOrchestratorTest.
+ */
 final class ChatControllerTest extends TestCase
 {
-    private OroAiAgent&MockObject $agent;
+    private ChatOrchestrator&MockObject $orchestrator;
+    private LlmErrorPresenter&MockObject $errorPresenter;
     private OroAiConfig&MockObject $config;
     private Environment&MockObject $twig;
+    private ChatProgressStore&MockObject $progressStore;
+    private WidgetConfigs&MockObject $widgetConfigs;
+    private ChatSessionStore&MockObject $sessionStore;
     private ChatController $controller;
 
     protected function setUp(): void
     {
-        // Role enum is co-defined in ChatMessage.php; ensure it's loaded before any test
-        // that may invoke parseHistory (which calls Role::tryFrom).
-        class_exists(ChatMessage::class, true);
-
-        $this->agent  = $this->createMock(OroAiAgent::class);
+        $this->orchestrator = $this->createMock(ChatOrchestrator::class);
+        $this->errorPresenter = $this->createMock(LlmErrorPresenter::class);
         $this->config = $this->createMock(OroAiConfig::class);
-        $this->twig   = $this->createMock(Environment::class);
-        $this->controller = new ChatController($this->agent, $this->config, $this->twig);
+        $this->twig = $this->createMock(Environment::class);
+        $this->progressStore = $this->createMock(ChatProgressStore::class);
+        $this->widgetConfigs = $this->createMock(WidgetConfigs::class);
+        $this->sessionStore = $this->createMock(ChatSessionStore::class);
+        $this->controller = new ChatController(
+            $this->orchestrator,
+            $this->errorPresenter,
+            $this->config,
+            $this->twig,
+            $this->progressStore,
+            $this->widgetConfigs,
+            $this->sessionStore,
+        );
+    }
+
+    private function outcome(string $reply = 'ok'): ChatOutcome
+    {
+        return new ChatOutcome(
+            reply: $reply,
+            toolTrace: [],
+            links: [],
+            usage: ['prompt_tokens' => 10, 'completion_tokens' => 5, 'total_tokens' => 15],
+            promptBreakdown: [],
+            cost: null,
+            sessionId: 'sess1',
+        );
     }
 
     public function testMessageActionReturnsNotConfiguredWhenNoApiKey(): void
@@ -59,21 +92,26 @@ final class ChatControllerTest extends TestCase
         self::assertStringContainsString('required', $data['error']);
     }
 
-    public function testMessageActionReturnsAgentReply(): void
+    public function testMessageActionSerializesTheOutcome(): void
     {
         $this->config->method('isConfigured')->willReturn(true);
 
-        $this->agent->method('run')
-            ->with('Where are customer users?', [])
-            ->willReturn(new AgentResult(
-                'Customer users are at /admin/customer/user/',
-                [['tool' => 'entity_url', 'args' => '{}', 'result' => '/admin/customer/user/']],
-                ['/admin/customer/user/'],
+        $this->orchestrator->expects(self::once())
+            ->method('handle')
+            ->with('Where are customer users?', 'sess1', null)
+            ->willReturn(new ChatOutcome(
+                reply: 'Customer users are at /admin/customer/user/',
+                toolTrace: [['tool' => 'entity_url', 'args' => '{}', 'result' => '/admin/customer/user/']],
+                links: ['/admin/customer/user/'],
+                usage: ['prompt_tokens' => 100, 'completion_tokens' => 20, 'total_tokens' => 120],
+                promptBreakdown: ['tools' => 1_400],
+                cost: ['total' => 0.001],
+                sessionId: 'sess1',
             ));
 
         $request = new Request([], [], [], [], [], [], json_encode([
             'message' => 'Where are customer users?',
-            'history' => [],
+            'session_id' => 'sess1',
         ]));
         $response = $this->controller->messageAction($request);
 
@@ -82,72 +120,113 @@ final class ChatControllerTest extends TestCase
         self::assertStringContainsString('customer/user', $data['reply']);
         self::assertCount(1, $data['tool_trace']);
         self::assertContains('/admin/customer/user/', $data['links']);
+        self::assertSame(120, $data['usage']['total_tokens']);
+        self::assertSame(['tools' => 1_400], $data['token_breakdown']);
+        self::assertSame('sess1', $data['session_id']);
+        self::assertArrayNotHasKey('harness_attempt', $data, 'plain-agent runs omit harness fields');
     }
 
-    public function testMessageActionHandlesAgentException(): void
+    public function testMessageActionWithRequestIdForwardsProgressAndClearsItAfterwards(): void
     {
         $this->config->method('isConfigured')->willReturn(true);
 
-        $this->agent->method('run')
-            ->willThrowException(new \RuntimeException('LLM API timeout'));
+        $capturedCallback = null;
+        $this->orchestrator->method('handle')
+            ->willReturnCallback(function (string $message, string $sessionId, ?callable $onProgress) use (&$capturedCallback): ChatOutcome {
+                $capturedCallback = $onProgress;
+
+                return $this->outcome();
+            });
+        $this->progressStore->expects(self::once())->method('clear')->with('req-123');
+
+        $request = new Request([], [], [], [], [], [], json_encode([
+            'message' => 'test',
+            'request_id' => 'req-123',
+        ]));
+        $this->controller->messageAction($request);
+
+        self::assertIsCallable($capturedCallback);
+
+        $this->progressStore->expects(self::once())
+            ->method('addStep')
+            ->with('req-123', ['type' => 'tool_call', 'tool' => 'sql_query']);
+
+        $capturedCallback(['type' => 'tool_call', 'tool' => 'sql_query']);
+    }
+
+    public function testMessageActionWithoutRequestIdPassesNullProgressCallback(): void
+    {
+        $this->config->method('isConfigured')->willReturn(true);
+
+        $capturedCallback = 'not-set';
+        $this->orchestrator->method('handle')
+            ->willReturnCallback(function (string $message, string $sessionId, ?callable $onProgress) use (&$capturedCallback): ChatOutcome {
+                $capturedCallback = $onProgress;
+
+                return $this->outcome();
+            });
+
+        $request = new Request([], [], [], [], [], [], json_encode(['message' => 'test']));
+        $this->controller->messageAction($request);
+
+        self::assertNull($capturedCallback);
+    }
+
+    public function testMessageActionMapsExceptionsThroughTheErrorPresenter(): void
+    {
+        $this->config->method('isConfigured')->willReturn(true);
+
+        $exception = new \RuntimeException('HTTP/1.1 429 Too Many Requests');
+        $this->orchestrator->method('handle')->willThrowException($exception);
+        $this->errorPresenter->expects(self::once())
+            ->method('humanize')->with($exception)
+            ->willReturn('API rate limit exceeded.');
+        $this->errorPresenter->expects(self::once())
+            ->method('detail')->with($exception)
+            ->willReturn('x-ratelimit-limit-requests: 60');
 
         $request = new Request([], [], [], [], [], [], json_encode(['message' => 'test']));
         $response = $this->controller->messageAction($request);
 
         self::assertSame(500, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        self::assertStringContainsString('LLM API timeout', $data['error']);
+        self::assertSame('API rate limit exceeded.', $data['error']);
+        self::assertSame('x-ratelimit-limit-requests: 60', $data['error_detail']);
     }
 
-    public function testMessageAction403ReturnsFirewallMessage(): void
+    public function testMessageActionClearsProgressEvenWhenTheTurnThrows(): void
     {
         $this->config->method('isConfigured')->willReturn(true);
-        $this->config->method('getProvider')->willReturn('openai');
+        $this->orchestrator->method('handle')->willThrowException(new \RuntimeException('boom'));
+        $this->progressStore->expects(self::once())->method('clear')->with('req-9');
 
-        $this->agent->method('run')
-            ->willThrowException(new \RuntimeException(
-                'HTTP/1.1 403 Forbidden returned for "https://api.openai.com/v1/chat/completions".'
-            ));
-
-        $request = new Request([], [], [], [], [], [], json_encode(['message' => 'test']));
-        $response = $this->controller->messageAction($request);
-
-        self::assertSame(500, $response->getStatusCode());
-        $data = json_decode($response->getContent(), true);
-        self::assertStringContainsString('firewall', $data['error']);
-        self::assertStringContainsString('api.openai.com', $data['error']);
+        $request = new Request([], [], [], [], [], [], json_encode([
+            'message' => 'test',
+            'request_id' => 'req-9',
+        ]));
+        $this->controller->messageAction($request);
     }
 
-    public function testMessageAction401ReturnsKeyMessage(): void
+    public function testProgressActionReturnsStepsFromStore(): void
     {
-        $this->config->method('isConfigured')->willReturn(true);
-        $this->config->method('getProvider')->willReturn('openai');
+        $this->progressStore->method('getSteps')
+            ->with('req-123')
+            ->willReturn([['type' => 'tool_call', 'tool' => 'sql_query']]);
 
-        $this->agent->method('run')
-            ->willThrowException(new \RuntimeException(
-                'HTTP/1.1 401 Unauthorized returned for "https://api.openai.com/v1/chat/completions".'
-            ));
-
-        $request = new Request([], [], [], [], [], [], json_encode(['message' => 'test']));
-        $response = $this->controller->messageAction($request);
+        $request = new Request(['request_id' => 'req-123']);
+        $response = $this->controller->progressAction($request);
 
         $data = json_decode($response->getContent(), true);
-        self::assertStringContainsString('Invalid API key', $data['error']);
+        self::assertSame([['type' => 'tool_call', 'tool' => 'sql_query']], $data['steps']);
     }
 
-    public function testMessageAction429ReturnsRateLimitMessage(): void
+    public function testProgressActionReturnsEmptyStepsForMissingRequestId(): void
     {
-        $this->config->method('isConfigured')->willReturn(true);
-        $this->config->method('getProvider')->willReturn('openai');
-
-        $this->agent->method('run')
-            ->willThrowException(new \RuntimeException('HTTP/1.1 429 Too Many Requests'));
-
-        $request = new Request([], [], [], [], [], [], json_encode(['message' => 'test']));
-        $response = $this->controller->messageAction($request);
+        $request = new Request();
+        $response = $this->controller->progressAction($request);
 
         $data = json_decode($response->getContent(), true);
-        self::assertStringContainsString('rate limit', $data['error']);
+        self::assertSame([], $data['steps']);
     }
 
     public function testStatusActionReturnsConfiguredFalse(): void
@@ -176,54 +255,25 @@ final class ChatControllerTest extends TestCase
         self::assertSame('anthropic', $data['provider']);
     }
 
-    public function testMessageActionParsesHistory(): void
+    public function testSessionsActionReturnsTheStoredList(): void
     {
-        $this->config->method('isConfigured')->willReturn(true);
+        $sessions = [['id' => 's1', 'title' => 'How many orders?', 'updated_at' => 1, 'count' => 2]];
+        $this->sessionStore->method('getSessions')->willReturn($sessions);
 
-        $this->agent->expects(self::once())
-            ->method('run')
-            ->willReturnCallback(function (string $msg, array $history) {
-                self::assertCount(2, $history);
-                self::assertSame('user', $history[0]->role->value);
-                self::assertSame('previous question', $history[0]->content);
-                self::assertSame('assistant', $history[1]->role->value);
-                self::assertSame('previous answer', $history[1]->content);
+        $data = json_decode($this->controller->sessionsAction()->getContent(), true);
 
-                return new AgentResult('follow-up answer', [], []);
-            });
-
-        $request = new Request([], [], [], [], [], [], json_encode([
-            'message' => 'follow up',
-            'history' => [
-                ['role' => 'user', 'content' => 'previous question'],
-                ['role' => 'assistant', 'content' => 'previous answer'],
-            ],
-        ]));
-
-        $response = $this->controller->messageAction($request);
-        self::assertSame(200, $response->getStatusCode());
+        self::assertSame($sessions, $data['sessions']);
     }
 
-    public function testMessageActionIgnoresInvalidHistoryRoles(): void
+    public function testSessionActionReturnsMessagesForTheRequestedId(): void
     {
-        $this->config->method('isConfigured')->willReturn(true);
+        $messages = [['role' => 'user', 'content' => 'hi']];
+        $this->sessionStore->method('getMessages')->with('s1')->willReturn($messages);
 
-        $this->agent->expects(self::once())
-            ->method('run')
-            ->willReturnCallback(function (string $msg, array $history) {
-                self::assertCount(1, $history);
+        $request = new Request(['id' => 's1']);
+        $data = json_decode($this->controller->sessionAction($request)->getContent(), true);
 
-                return new AgentResult('ok', [], []);
-            });
-
-        $request = new Request([], [], [], [], [], [], json_encode([
-            'message' => 'test',
-            'history' => [
-                ['role' => 'invalid_role', 'content' => 'should be skipped'],
-                ['role' => 'user', 'content' => 'valid'],
-            ],
-        ]));
-
-        $this->controller->messageAction($request);
+        self::assertSame('s1', $data['id']);
+        self::assertSame($messages, $data['messages']);
     }
 }

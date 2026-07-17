@@ -7,6 +7,8 @@ namespace Genaker\Bundle\OroAI\Tests\Integration;
 use Genaker\Bundle\LocalIntegrationTests\Util\IntegrationTestCase;
 use Genaker\Bundle\OroAI\Agent\LearningRecorder;
 use Genaker\Bundle\OroAI\Agent\OroAiAgent;
+use Genaker\Bundle\OroAI\Agent\ResearchAgentInterface;
+use Genaker\Bundle\OroAI\Agent\ResearchSubAgent;
 use Genaker\Bundle\OroAI\Agent\ToolRegistry;
 use Genaker\Bundle\OroAI\Controller\ChatController;
 use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
@@ -370,6 +372,18 @@ class OroAIBundleTest extends IntegrationTestCase
 
         self::assertNotContains('log_reader', $names, 'log_reader is disabled by default');
         self::assertNotContains('system_info', $names, 'system_info is disabled by default');
+        self::assertNotContains('research', $names, 'research is disabled by default');
+    }
+
+    public function testResearchSubAgentIsRegisteredAndWired(): void
+    {
+        // ResearchAgentInterface's alias is private (like HarnessInterface/
+        // RagStoreInterface elsewhere in this bundle) -- it only needs to be
+        // resolvable via constructor autowiring, not fetched directly from
+        // the container, so we fetch the concrete public service instead.
+        $subAgent = static::getContainer()->get(ResearchSubAgent::class);
+
+        self::assertInstanceOf(ResearchAgentInterface::class, $subAgent);
     }
 
     public function testToolRegistryEnabledToolsArePresent(): void

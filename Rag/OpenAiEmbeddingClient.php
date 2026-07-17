@@ -7,6 +7,7 @@ namespace Genaker\Bundle\OroAI\Rag;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+/** Generates text embeddings via the OpenAI (or compatible) embeddings API. */
 final class OpenAiEmbeddingClient implements EmbeddingClientInterface
 {
     private const string DEFAULT_URL = 'https://api.openai.com/v1/embeddings';

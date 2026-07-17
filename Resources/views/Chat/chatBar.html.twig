@@ -15,7 +15,7 @@
     vertical-align: middle;
 }
 /* Input bar when relocated inside the chat panel */
-#oroai-panel-input-bar .oroai-inline {
+#oroai-hc-panel-input-bar .oroai-inline {
     display: flex;
     max-width: none;
     max-height: none;
@@ -24,11 +24,11 @@
     flex: 1;
     width: 100%;
 }
-#oroai-panel-input-bar .oroai-inline-input {
+#oroai-hc-panel-input-bar .oroai-inline-input {
     height: 32px;
     font-size: 13px;
 }
-#oroai-panel-input-bar {
+#oroai-hc-panel-input-bar {
     padding: 6px 0 2px;
     border-top: 1px solid #f0f0f0;
 }
@@ -123,15 +123,74 @@
 .oroai-hc-msg.user      { background: #e3f2fd; margin-left: auto; text-align: right; }
 .oroai-hc-msg.assistant { background: #f5f5f5; border: 1px solid #e8e8e8; margin-right: auto; }
 .oroai-hc-msg.error     { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; margin-right: auto; }
+.oroai-hc-msg .oroai-list{margin:4px 0 4px 0;padding-left:18px}
+.oroai-hc-msg .oroai-list li{margin:2px 0}
+.oroai-hc-msg code{background:#f0f0f0;border:1px solid #e0e0e0;border-radius:3px;padding:0 3px;font-size:11px}
+.oroai-hc-msg .oroai-code{background:#f6f6f6;border:1px solid #e0e0e0;border-radius:5px;padding:6px 8px;margin:4px 0;overflow-x:auto;white-space:pre-wrap;font-size:11px}
+.oroai-error-details { margin-top: 5px; }
+.oroai-error-details summary { cursor: pointer; font-size: 10px; color: inherit; opacity: .75; user-select: none; }
+.oroai-error-details summary:hover { opacity: 1; }
+.oroai-error-details .oroai-code { color: #444; }
 .oroai-hc-msg a         { color: #1a73e8; text-decoration: underline; }
 .oroai-hc-msg .oroai-trace { font-size: 10px; color: #9e9e9e; margin-top: 3px; border-top: 1px solid #f0f0f0; padding-top: 2px; }
+.oroai-trace-tool { cursor: help; border-bottom: 1px dotted #b0b0b0; }
+.oroai-hc-msg .oroai-usage { font-size: 10px; color: #b0b0b0; margin-top: 3px; }
 .oroai-hc-loading       { text-align: center; padding: 5px; color: #9e9e9e; font-size: 11px; font-style: italic; }
+@keyframes oroai-fade-in {
+    from { opacity: 0.35; }
+    to   { opacity: 1; }
+}
+.oroai-hc-loading--pulse { animation: oroai-fade-in 0.35s ease-out; }
+.oroai-hc-tokens        { font-size: 10px; font-weight: 400; color: #9e9e9e; }
+.oroai-hc-tokenbar      { display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-top: 1px solid #eef0f2; background: #fafbfc; white-space: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.oroai-tokenbar-chip    { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 2px 7px; border-radius: 10px; background: #f1f3f5; border: 1px solid #e6e9ec; color: #5f6b76; font-size: 10px; line-height: 1.4; cursor: help; transition: background 0.15s; }
+.oroai-tokenbar-chip:hover { background: #e9edf2; }
+.oroai-tokenbar-val     { font-weight: 600; color: #37424c; font-variant-numeric: tabular-nums; }
+.oroai-tokenbar-div     { width: 1px; height: 14px; background: #dde1e6; margin: 0 4px; flex: none; }
+.oroai-tokenbar-cost    { background: #e8f5e9; border-color: #c8e6c9; color: #2e7d32; }
+.oroai-tokenbar-cost:hover { background: #dcefdd; }
+.oroai-tokenbar-cost .oroai-tokenbar-val { color: #1b5e20; }
+.oroai-sessions         { padding: 4px 10px 8px; border-top: 1px solid #eef0f2; background: #fafbfc; }
+.oroai-sessions-title   { font-size: 9px; font-weight: 600; color: #9aa5b0; text-transform: uppercase; letter-spacing: 0.5px; margin: 2px 0 3px; }
+.oroai-session-row      { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; font-size: 11px; color: #5f6b76; cursor: pointer; }
+.oroai-session-row:hover { background: #eef2f6; color: #2f3a44; }
+.oroai-session-row.active { background: #e3f2fd; color: #1a5da8; }
+.oroai-session-name     { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oroai-session-time     { flex: none; font-size: 9px; color: #a5aeb7; }
+
+/* ── Live "what is it doing" checklist while a request is in flight ──────── */
+.oroai-checklist {
+    list-style: none;
+    margin: 4px 0;
+    padding: 6px 10px;
+    background: #f5f5f5;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    max-width: 85%;
+    font-size: 11px;
+}
+.oroai-checklist li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    color: #777;
+}
+.oroai-checklist li .oroai-checklist-icon { width: 12px; flex-shrink: 0; text-align: center; }
+.oroai-checklist li.pending .oroai-checklist-icon::before { content: '⏳'; }
+.oroai-checklist li.done .oroai-checklist-icon::before    { content: '✓'; color: #2e7d32; }
+.oroai-checklist li.error .oroai-checklist-icon::before   { content: '✗'; color: #c62828; }
+.oroai-checklist li.done    { color: #444; }
+.oroai-checklist li.error   { color: #c62828; }
 </style>
 
 {# Inline input — rendered inside .app-header__search-and-shortcuts via navbar placeholder #}
 <div class="oroai-inline"
-     id="oroai-hc"
+     id="oroai-hc-root"
      data-message-url="{{ path('genaker_oroai_chat_message') }}"
+     data-progress-url="{{ path('genaker_oroai_chat_progress') }}"
+     data-sessions-url="{{ path('genaker_oroai_chat_sessions') }}"
+     data-session-url="{{ path('genaker_oroai_chat_session') }}"
      data-csrf-token="{{ csrf_token('') }}">
     <input type="text"
            class="oroai-inline-input"
@@ -151,11 +210,11 @@
 <span id="oroai-hc-anchor" style="display:none;"></span>
 
 {# Message history panel — JS moves this to sit right after .app-header__container-panel #}
-<div class="oroai-panel" id="oroai-panel" aria-hidden="true">
+<div class="oroai-panel" id="oroai-hc-panel" aria-hidden="true">
     <div class="oroai-panel-inner">
         <div id="oroai-hc-body" style="display:none">
             <div class="oroai-hc-bar">
-                <span>AI Assistant (gemini)</span>
+                <span>AI Assistant (gemini) <span id="oroai-hc-tokens" class="oroai-hc-tokens"></span></span>
                 <div class="oroai-hc-bar-btns">
                     <button type="button" id="oroai-hc-minimize" title="Minimize" aria-label="Minimize">
                         <i class="fa fa-minus" aria-hidden="true"></i>
@@ -168,10 +227,13 @@
             <div class="oroai-hc-msgs-wrap">
                 <div id="oroai-hc-msgs"></div>
             </div>
-            <div id="oroai-panel-input-bar"></div>
+            <div id="oroai-hc-panel-input-bar"></div>
+            <div id="oroai-hc-tokenbar" class="oroai-hc-tokenbar" style="display:none"></div>
+            <div id="oroai-hc-sessions" class="oroai-sessions" style="display:none"></div>
         </div>
     </div>
 </div>
 
 <script src="{{ asset('bundles/genakeroroai/js/oroai-chat.js') }}"></script>
+<script>window.initOroAiChat({idPrefix: 'oroai-hc', mode: 'panel'});</script>
 {% endif %}

@@ -1,7 +1,7 @@
 dashboards:
     widgets:
         genaker_oroai_chat:
-            label:       'AI Assistant'
+            label:       'ORO AI Assistant'
             description: 'Chat with the OroAI Assistant directly from your dashboard'
             route:       genaker_oroai_widget_chat
             route_parameters: {}

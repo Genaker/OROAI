@@ -9,6 +9,7 @@ use Genaker\Bundle\OroAI\Core\Contract\AiToolInterface;
 use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Core\Model\ToolResult;
 
+/** AI tool to list tables and describe columns and constraints in the database schema. */
 final class SchemaInspectorTool implements AiToolInterface
 {
     public function __construct(
@@ -25,7 +26,8 @@ final class SchemaInspectorTool implements AiToolInterface
     {
         return new ToolDefinition(
             'schema_inspector',
-            'Inspect the database schema. Use "list_tables" to get all table names, or "describe_table" with a table_name to see columns and constraints.',
+            'Inspect the database schema. Use "list_tables" to get all table names, or "describe_table" with a table_name to see columns and constraints. '
+            . 'Use before writing a sql_query to confirm real table/column names instead of guessing them.',
             [
                 'type' => 'object',
                 'properties' => [

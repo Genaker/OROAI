@@ -14,6 +14,7 @@ use Genaker\Bundle\OroAI\Core\Model\ToolDefinition;
 use Genaker\Bundle\OroAI\Service\OroAiConfig;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+/** LLM client that calls the OpenAI chat completions API with function-calling support. */
 final class OpenAiClient implements LlmClientInterface
 {
     private const string DEFAULT_URL = 'https://api.openai.com/v1/chat/completions';
@@ -22,7 +23,8 @@ final class OpenAiClient implements LlmClientInterface
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly OroAiConfig $config,
-    ) {}
+    ) {
+    }
 
     public function getName(): string
     {
@@ -74,7 +76,12 @@ final class OpenAiClient implements LlmClientInterface
             content: $message['content'] ?? '',
             toolCalls: $toolCalls,
             finishReason: $choice['finish_reason'] ?? null,
-            usage: $data['usage'] ?? [],
+            usage: LlmResponse::normalizeUsage(
+                $data['usage'] ?? [],
+                'prompt_tokens',
+                'completion_tokens',
+                'total_tokens',
+            ),
         );
     }
 
